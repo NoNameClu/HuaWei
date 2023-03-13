@@ -1,0 +1,10 @@
+^E:\绿洲\华为挑战赛\WINDOWSRELEASE\SDK\C++\CMAKEFILES\3CFCDEF4521139CC212F0FD9E765D513\GENERATE.STAMP.RULE
+setlocal
+E:\cmake\bin\cmake.exe -SE:/绿洲/华为挑战赛/WindowsRelease/SDK/c++ -BE:/绿洲/华为挑战赛/WindowsRelease/SDK/c++ --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file E:/绿洲/华为挑战赛/WindowsRelease/SDK/c++/CodeCraftSDK.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

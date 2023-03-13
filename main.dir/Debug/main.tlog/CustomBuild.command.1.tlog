@@ -1,0 +1,10 @@
+^E:\绿洲\华为挑战赛\WINDOWSRELEASE\SDK\C++\CMAKELISTS.TXT
+setlocal
+E:\cmake\bin\cmake.exe -SE:/绿洲/华为挑战赛/WindowsRelease/SDK/c++ -BE:/绿洲/华为挑战赛/WindowsRelease/SDK/c++ --check-stamp-file E:/绿洲/华为挑战赛/WindowsRelease/SDK/c++/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
