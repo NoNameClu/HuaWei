@@ -37,6 +37,8 @@ struct route {
 struct robot {
 	bool on_job;
 	pair<int, int> object_target;
+	double a_speed;
+	pair<double, double> l_speed;
 	bool can_buy, can_sell;
 	robot_state state;
 	route cur;
