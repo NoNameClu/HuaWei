@@ -159,6 +159,73 @@ void Command::initMap()
 
 void Command::UpdateInfo()
 {
+	if (buf.empty()) {
+
+	}
+	string a;
+	stringstream sa;
+
+	//	读第一行
+	int index = 0;
+	a = buf[index++];
+	sa << a;
+	sa >> frame;
+	sa >> money;
+
+	//	读第二行
+	a = buf[index++];
+	sa << a;
+	sa >> worker_num;
+
+	int n = worker_num;
+	while (n--) {
+		//	读第3到n+3行
+		a = buf[index++];
+		sa << a;
+
+		worker tmp;
+		sa >> tmp.style;
+		pair<double, double> real_pos;
+		sa >> real_pos.first;
+		sa >> real_pos.second;
+		tmp.real_pos = real_pos;	//	坐标转化
+		tmp.pos = make_pair(
+			(real_pos.first + 0.25) * 2, (real_pos.second + 0.25) * 2);
+
+		int time;
+		sa >> time;		// 工作台剩余的生产时间（没有用到）
+		sa >> tmp.hold_object;
+		sa >> tmp.output;
+		int id = tmp.pos.first * 100 + tmp.pos.second;
+		worker tmp2 = idToworker[id];	// tmp2记录了此工作台上一帧的状态，但还没有与当前帧比较判错
+		idToworker[id] = tmp;
+	}
+
+	for (int i = 0; i < 4; i++) {
+		a = buf[index++];
+		sa << a;
+
+		int workerID;
+		sa >> workerID;
+		int item;
+		sa >> item;
+
+		double time_weight, collide_weight;		// 时间价值系数和碰撞价值系数，没有用上
+		sa >> time_weight;
+		sa >> collide_weight;
+
+		double a_speed,face;
+		pair<double, double> l_speed, real_pos;
+		sa >> a_speed >> l_speed.first >> l_speed.second;
+		sa >> face;
+		sa >> real_pos.first >> real_pos.second;
+		
+		robots[i].on_job = item > 0;	// 携带物品编号大于0就表示在工作中
+		robots[i].face = face;			// 更新机器人信息
+		robots[i].a_speed = a_speed;
+		robots[i].l_speed = l_speed;
+		robots[i].real_pos = real_pos;
+	}
 }
 
 void Command::RobotDoWork()

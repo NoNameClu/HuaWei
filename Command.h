@@ -6,10 +6,11 @@
 #include <vector>
 #include <string>
 #include "math.h"
+#include<sstream>
 
 using namespace std;
 
-const int OBJECT_ONE = 1;
+const int OBJECT_NULL = 1;	// 修改 重名了
 const int OBJECT_ONE = 1 << 1;
 const int OBJECT_TWO = 1 << 2;
 const int OBJECT_THREE = 1 << 3;
@@ -31,6 +32,7 @@ struct worker {
 	int need_object;					//添加need，表示所需要的，上面的表示持有的
 	int product_object;					//生产物品
 	int need_money, sell_money;			//该工作台制造的物品的买价格和售价格
+	bool output;						//有没有产物
 
 	pair<int, int> pos;
 	pair<double, double> real_pos;
