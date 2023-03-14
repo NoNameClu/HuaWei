@@ -6,42 +6,57 @@ void Command::init()
 {
 	ReadUntilOK();
 	initMap();		//这一步中将两个路线队列初始化完毕。
-	Clear();
 	Add_OK();
 	Response();
+	Clear();
 }
 
 void Command::start()
 {
 	while (ReadUntilOK()) {
-		Clear();
 		UpdateInfo();
 		Add_frame();
 		RobotDoWork();
 		RobotSelectWork();
 		Add_OK();
 		Response();
+		Clear();
 	}
 }
 
 bool Command::ReadUntilOK()
 {
+	string line;
+	while (getline(cin, line)) {
+		if (line[0] == 'O' && line[1] == 'K')
+			return true;
+
+		buf.push_back(line);
+	}
+	return false;
 }
 
 void Command::Clear()
 {
+	buf.clear();
+	response.clear();
 }
 
 void Command::Add_OK()
 {
+	response.push_back("OK");
 }
 
 void Command::Add_frame()
 {
+	response.push_back(to_string(frame));
 }
 
 void Command::Response()
 {
+	for (const auto& res : response) {
+		cout << res << endl;
+	}
 }
 
 void Command::initMap()
@@ -148,19 +163,68 @@ void Command::UpdateInfo()
 
 void Command::RobotDoWork()
 {
+	if (stat == WRONG) {
+		for (int i = 0; i < robots.size(); ++i) {
+			string first = "", second = "", third = "";
+			first += "forward ";
+			first += to_string(i);
+			first += " ";
+			first += to_string(0);
+			second += "rotate ";
+			second += to_string(i);
+			second += " ";
+			second += to_string(0);
+			third += "destroy ";
+			third += to_string(i);
+			response.push_back(first);
+			response.push_back(second);
+			response.push_back(third);
+		}
+		return;
+	}
+
 	worker next;
+	string fd, ro;
 	//循环判断哪些robot已经被选择了路线
-	for (auto rt : robots) {
+	for (int i = 0; i < robots.size(); ++i) {
+		robot rt = robots[i];
 		if (!rt.on_job) {
 			continue;
 		}
+		if (rt.can_buy) {
+			string temp = "";
+			temp += "buy ";
+			temp += to_string(i);
+			response.push_back(temp);
+			rt.state = AFTER;
+		}
+
+		if (rt.can_sell) {
+			string temp = "";
+			temp += "sell ";
+			temp += to_string(i);
+			response.push_back(temp);
+			rt.state = NONE;
+			rt.on_job = false;
+		}
+
 		switch (rt.state) {
 		case BEFORE:
 			next = idToworker[rt.cur.start];
 		case AFTER:
 			next = idToworker[rt.cur.end];
-		default:
-			//不应该出现这种情况，若出现这种情况应当是程序逻辑有误
+		case NONE:
+			fd += "forward ";
+			fd += to_string(i);
+			fd += " ";
+			fd += to_string(0);
+			ro += "rotate ";
+			ro += to_string(i);
+			ro += " ";
+			ro += to_string(0);
+			response.push_back(fd);
+			response.push_back(ro);
+			return;
 		}
 
 		//找到了目标
@@ -168,25 +232,46 @@ void Command::RobotDoWork()
 		double x = next.real_pos.second - rt.real_pos.second,
 			y = next.real_pos.first - rt.real_pos.first;
 		double target_angle = atan2(y, x);
-		double a_diff = abs(target_angle - rt.face);
+		double a_diff = target_angle + (-rt.face);
+		if (a_diff > M_PI) {
+			a_diff -= 2 * M_PI;
+		}
+		else if (a_diff < (-M_PI)) {
+			a_diff += 2 * M_PI;
+		}
+		int dir = a_diff > 0 ? 1 : -1;
+		a_diff = abs(a_diff);
+		//当机器人和目标地点偏角很大
 		if (a_diff >= M_PI_2) {
 			speed = 0.5;
-			angle = M_PI;
+			angle = M_PI * dir;
 		}
+		//当机器人和目标地点偏角较大
 		else if(a_diff >= M_PI_8) {
 			speed = 3;
-			angle = M_PI_4;
+			angle = M_PI_4 * dir;
 		}
+		//做微调  
 		else if(a_diff >= M_PI_32) {
 			speed = 5;
-			angle = M_PI_8;
+			angle = M_PI_16 * dir;
 		}
+		//前进
 		else {
 			speed = 6;
 			angle = 0;
 		}
 
-
+		fd += "forward ";
+		fd += to_string(i);
+		fd += " ";
+		fd += to_string(speed);
+		ro += "rotate ";
+		ro += to_string(i);
+		ro += " ";
+		ro += to_string(angle);
+		response.push_back(fd);
+		response.push_back(ro);
 	}
 }
 
