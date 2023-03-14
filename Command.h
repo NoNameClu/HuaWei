@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
+#include <queue>
 #include <list>
 #include <vector>
 #include <string>
@@ -53,7 +54,7 @@ struct route {
 	int base;						//所需的最小钱数
 	double value;					//这里一开始就要做归一化操作
 	int length;
-	int object;
+	int object;						//当前路线操作的物品
 	int stat;						//表示当前路线的状态
 
 	route() {};
@@ -109,12 +110,12 @@ class Command
 	void mapToreal(pair<int, int>, pair<double, double>&);
 	void realTomap(pair<double, double>, pair<int, int>&);
 	double GetLength(const pair<double, double>&, const pair<double, double>&);
+
 	void Clean_list();
 	void flush_list();
 	void flush_money_stat();
 	void takeoff_product_stat(int id);
 	void takeoff_need_stat();
-	void takeoff_occ_stat(int id);
 	void puton_product_stat(int id);
 	void puton_occ_stat(int id);
 	void puton_occ_stat(int id, int object);

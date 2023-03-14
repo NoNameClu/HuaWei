@@ -157,13 +157,14 @@ void Command::initMap()
 			max_value = max(temp.value, max_value);
 			temp.object = start.product_object;
 			temp.length = GetLength(start.real_pos, end.real_pos);
+			temp.stat = NO_PRODUCT;
 			unavaliable.push_back(temp);
 		}
 	}
 
 	//先对收益归一化
 	for (auto& rou : unavaliable) {
-		rou.value /= max_value;
+		rou.value /= max_value;		//0 - 1 小数
 	}
 }
 
@@ -373,6 +374,25 @@ void Command::RobotDoWork()
 
 void Command::RobotSelectWork()
 {
+	for () {
+		//判断当前机器人是否有工作
+		//拿到当前机器人的坐标，
+		//遍历可选的路线，统计可选路线各个的长度
+		//first：总长度，second：路线
+		pair<double, route>;
+		for () {
+
+		}
+		//保存在这里
+		priority_queue;
+		//你取出来了这个路线
+		//start,end
+		//puton_occ_stat(start);
+		//puton_occ_stat(end, route.object);
+		//flush_list();
+		// 
+		//robot.cur = route;
+	}
 }
 
 void Command::mapToreal(pair<int, int> old, pair<double, double>& ret)
