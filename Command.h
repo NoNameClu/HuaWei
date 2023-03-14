@@ -3,6 +3,7 @@
 #include <unordered_set>
 #include <list>
 #include <vector>
+#include "math.h"
 
 using namespace std;
 
@@ -26,6 +27,7 @@ struct worker {
 	int style;
 	int hold_object;
 	int need_object;					//添加need，表示所需要的，上面的表示持有的
+	int product_object;					//生产物品
 	int need_money, sell_money;			//该工作台制造的物品的买价格和售价格
 
 	pair<int, int> pos;
@@ -37,9 +39,9 @@ struct worker {
 struct route {
 	int start, end;
 	int base;					//所需的最小钱数
-	int value;					//这里一开始就要做归一化操作
+	double value;					//这里一开始就要做归一化操作
 	int length;
-	int start_object, end_object;
+	int object;
 
 	route() {};
 	route(int s, int e) : start(s), end(e) {};
@@ -52,12 +54,13 @@ struct robot {
 	robot_state state;
 	route cur;
 	
+	double face;						//朝向
 	double a_speed;						//角速度
 	pair<double, double> l_speed;		//线速度
 	pair<double, double> real_pos;		//机器人的当前坐标，每一帧读取的时候要改变
 
 	robot() : on_job(false), can_buy(false), can_sell(false),
-		state(NONE), a_speed(0), l_speed(make_pair(0, 0)) {};
+		state(NONE), face(0), a_speed(0), l_speed(make_pair(0, 0)) {};
 
 };
 
@@ -92,6 +95,7 @@ class Command
 
 	void mapToreal(pair<int, int>, pair<double, double>&);
 	void realTomap(pair<double, double>, pair<int, int>&);
+	double GetLength(const pair<double, double>&, const pair<double, double>&);
 public:
 	Command() = default;
 	~Command() = default;
