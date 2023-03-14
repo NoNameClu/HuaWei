@@ -4,7 +4,9 @@
     <ClCompile Include="E:\绿洲\华为挑战赛\WindowsRelease\SDK\c++\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Command.cpp" />
+    <ClCompile Include="Command.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="E:\绿洲\华为挑战赛\WindowsRelease\SDK\c++\CMakeLists.txt" />
@@ -15,8 +17,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Command.h" />
     <ClInclude Include="math.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Command.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

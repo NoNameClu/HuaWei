@@ -81,16 +81,19 @@ void Command::initMap()
 				case 1:
 					temp.need_money = 3000;
 					temp.sell_money = 6000;
+					temp.need_object = OBJECT_NULL;
 					temp.product_object = OBJECT_ONE;
 					break;
 				case 2:
 					temp.need_money = 4400;
 					temp.sell_money = 7600;
+					temp.need_object = OBJECT_NULL;
 					temp.product_object = OBJECT_TWO;
 					break;
 				case 3:
 					temp.need_money = 5800;
 					temp.sell_money = 9200; 
+					temp.need_object = OBJECT_NULL;
 					temp.product_object = OBJECT_THREE;
 					break;
 				case 4:
@@ -135,10 +138,11 @@ void Command::initMap()
 	}
 
 	//循环判断计算路径
-	for (auto p : idToworker) {
+	double max_value = 0;
+	for (auto& p : idToworker) {
 		int start_id = p.first;
 		worker start = p.second;
-		for (auto q : idToworker) {
+		for (auto& q : idToworker) {
 			int end_id = q.first;
 			worker end = q.second;
 			if (start_id == end_id) {
@@ -150,18 +154,21 @@ void Command::initMap()
 			route temp(start_id, end_id);
 			temp.base = start.need_money;
 			temp.value = start.sell_money - start.need_money;
+			max_value = max(temp.value, max_value);
 			temp.object = start.product_object;
 			temp.length = GetLength(start.real_pos, end.real_pos);
 			unavaliable.push_back(temp);
 		}
 	}
+
+	//先对收益归一化
+	for (auto& rou : unavaliable) {
+		rou.value /= max_value;
+	}
 }
 
 void Command::UpdateInfo()
 {
-	if (buf.empty()) {
-
-	}
 	string a;
 	stringstream sa;
 
@@ -170,7 +177,14 @@ void Command::UpdateInfo()
 	a = buf[index++];
 	sa << a;
 	sa >> frame;
-	sa >> money;
+	int m_temp;
+	sa >> m_temp;
+	if (m_temp != money) {
+		stat = WRONG;
+		Clean_list();
+	}
+	money = m_temp;
+	flush_money_stat();
 
 	//	读第二行
 	a = buf[index++];
@@ -189,15 +203,18 @@ void Command::UpdateInfo()
 		sa >> real_pos.first;
 		sa >> real_pos.second;
 		tmp.real_pos = real_pos;	//	坐标转化
-		tmp.pos = make_pair(
-			(real_pos.first + 0.25) * 2, (real_pos.second + 0.25) * 2);
+		mapToreal(tmp.pos, tmp.real_pos); 
 
 		int time;
 		sa >> time;		// 工作台剩余的生产时间（没有用到）
+		tmp.time = time;
 		sa >> tmp.hold_object;
 		sa >> tmp.output;
 		int id = tmp.pos.first * 100 + tmp.pos.second;
 		worker tmp2 = idToworker[id];	// tmp2记录了此工作台上一帧的状态，但还没有与当前帧比较判错
+		if (tmp.output) {
+			takeoff_product_stat(id);
+		}
 		idToworker[id] = tmp;
 	}
 
@@ -220,12 +237,15 @@ void Command::UpdateInfo()
 		sa >> face;
 		sa >> real_pos.first >> real_pos.second;
 		
-		robots[i].on_job = item > 0;	// 携带物品编号大于0就表示在工作中
+		//robots[i].on_job = item > 0;	// 携带物品编号大于0就表示在工作中
 		robots[i].face = face;			// 更新机器人信息
 		robots[i].a_speed = a_speed;
 		robots[i].l_speed = l_speed;
 		robots[i].real_pos = real_pos;
 	}
+
+	takeoff_need_stat();
+	flush_list();
 }
 
 void Command::RobotDoWork()
@@ -264,6 +284,8 @@ void Command::RobotDoWork()
 			temp += to_string(i);
 			response.push_back(temp);
 			rt.state = AFTER;
+			money -= rt.cur.base;
+			puton_product_stat(rt.cur.start);
 		}
 
 		if (rt.can_sell) {
@@ -273,13 +295,18 @@ void Command::RobotDoWork()
 			response.push_back(temp);
 			rt.state = NONE;
 			rt.on_job = false;
+			auto temp_worker = idToworker[rt.cur.end];
+			money += rt.cur.value + rt.cur.base;
+			puton_need_stat(rt.cur.end, rt.cur.object);
 		}
 
 		switch (rt.state) {
 		case BEFORE:
 			next = idToworker[rt.cur.start];
+			break;
 		case AFTER:
 			next = idToworker[rt.cur.end];
+			break;
 		case NONE:
 			fd += "forward ";
 			fd += to_string(i);
@@ -340,6 +367,8 @@ void Command::RobotDoWork()
 		response.push_back(fd);
 		response.push_back(ro);
 	}
+
+	flush_list();
 }
 
 void Command::RobotSelectWork()
@@ -361,4 +390,101 @@ void Command::realTomap(pair<double, double> old, pair<int, int>& ret)
 double Command::GetLength(const pair<double, double>& lhs, const pair<double, double>& rhs) {
 	double x = lhs.first - rhs.first, y = lhs.second - rhs.second;
 	return sqrt(x * x + y * y);
+}
+
+void Command::Clean_list() {
+	for (auto p = avaliable.begin(); p != avaliable.end();) {
+		unavaliable.insert(unavaliable.end(), *p);
+		p = avaliable.erase(p);
+	}
+	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
+		p->stat = NO_PRODUCT;
+	}
+}
+
+void Command::flush_list() {
+	for (auto p = avaliable.begin(); p != avaliable.end();) {
+		if (p->stat != 0) {
+			unavaliable.insert(unavaliable.end(), *p);
+			p = avaliable.erase(p);
+		}
+		else {
+			++p;
+		}
+	}
+
+	for (auto p = unavaliable.begin(); p != unavaliable.end();) {
+		if (p->stat == 0) {
+			avaliable.insert(avaliable.end(), *p);
+			p = unavaliable.erase(p);
+		}
+		else {
+			++p;
+		}
+	}
+}
+
+void Command::flush_money_stat() {
+	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
+		if (p->base >= money) {
+			p->stat &= (~NO_MONEY);
+		}
+	}
+	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
+		if (p->base < money) {
+			p->stat |= NO_MONEY;
+		}
+	}
+}
+
+void Command::takeoff_product_stat(int id) {
+	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
+		if (p->start == id) {
+			p->stat &= (~NO_PRODUCT);
+		}
+	}
+}
+
+void Command::puton_product_stat(int id) {
+	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
+		if (p->start == id) {
+			p->stat &= (~OCC);
+			p->stat |= NO_PRODUCT;
+		}
+	}
+}
+
+//start版本
+void Command::puton_occ_stat(int id) {
+	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
+		if (p->start == id) {
+			p->stat |= OCC;
+		}
+	}
+}
+
+//end版本
+void Command::puton_occ_stat(int id, int object) {
+	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
+		if (p->end == id && p->object == object) {
+			p->stat |= OCC;
+		}
+	}
+}
+
+void Command::puton_need_stat(int id, int object) {
+	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
+		if (p->end == id && p->object == object) {
+			p->stat &= (~OCC);
+			p->stat |= NO_NEED;
+		}
+	}
+}
+
+void Command::takeoff_need_stat() {
+	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
+		if ((idToworker[p->end].hold_object & p->object) == 0) {
+			p->stat &= (~NO_NEED);
+		}
+	}
 }

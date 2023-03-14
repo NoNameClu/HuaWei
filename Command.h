@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
 #include <list>
@@ -19,6 +20,12 @@ const int OBJECT_FIVE = 1 << 5;
 const int OBJECT_SIX = 1 << 6;
 const int OBJECT_SEVEN = 1 << 7;
 
+const int OK = 0;
+const int NO_MONEY = 1;
+const int NO_PRODUCT = 1 << 1;
+const int NO_NEED = 1 << 2;
+const int OCC = 1 << 3;
+
 enum robot_state {
 	//添加none状态，表示现在没有分配工作
 	NONE,			
@@ -32,6 +39,7 @@ struct worker {
 	int need_object;					//添加need，表示所需要的，上面的表示持有的
 	int product_object;					//生产物品
 	int need_money, sell_money;			//该工作台制造的物品的买价格和售价格
+	int time;							//剩余时间
 	bool output;						//有没有产物
 
 	pair<int, int> pos;
@@ -42,10 +50,11 @@ struct worker {
 
 struct route {
 	int start, end;
-	int base;					//所需的最小钱数
+	int base;						//所需的最小钱数
 	double value;					//这里一开始就要做归一化操作
 	int length;
 	int object;
+	int stat;						//表示当前路线的状态
 
 	route() {};
 	route(int s, int e) : start(s), end(e) {};
@@ -100,6 +109,16 @@ class Command
 	void mapToreal(pair<int, int>, pair<double, double>&);
 	void realTomap(pair<double, double>, pair<int, int>&);
 	double GetLength(const pair<double, double>&, const pair<double, double>&);
+	void Clean_list();
+	void flush_list();
+	void flush_money_stat();
+	void takeoff_product_stat(int id);
+	void takeoff_need_stat();
+	void takeoff_occ_stat(int id);
+	void puton_product_stat(int id);
+	void puton_occ_stat(int id);
+	void puton_occ_stat(int id, int object);
+	void puton_need_stat(int id, int object);
 public:
 	Command() = default;
 	~Command() = default;
