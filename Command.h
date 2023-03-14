@@ -53,7 +53,7 @@ struct route {
 	int start, end;
 	int base;						//所需的最小钱数
 	double value;					//这里一开始就要做归一化操作
-	int length;
+	double length;
 	int object;						//当前路线操作的物品
 	int stat;						//表示当前路线的状态
 

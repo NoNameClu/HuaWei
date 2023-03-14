@@ -64,16 +64,16 @@ void Command::initMap()
 	//循环地图数据，先保存下所有工作台和机器人的初始位置，此处默认缓冲区buf末尾没有ok。
 	for (int i = 0; i < buf.size(); ++i) {
 		for (int j = 0; j < buf[0].size(); ++j) {
-			if (buf[i][j] == 'A') {
+			if (buf[i][j] == 'A') {		// 机器人
 				robot temp;
 				temp.state = NONE;
 				robots.push_back(temp);
 			}
-			if (style.find(buf[i][j] - '0') != style.end()) {
+			if (style.find(buf[i][j] - '0') != style.end()) {	// 机器人
 				worker temp;
-				pair<int, int> pos = make_pair(i, j);
+				pair<int, int> pos = make_pair(i, j);	//	工作台int坐标
 				pair<double, double> real_pos;
-				mapToreal(pos, real_pos);
+				mapToreal(pos, real_pos);				//	int坐标转double实际坐标
 				temp.pos = pos;
 				temp.real_pos = real_pos;
 				temp.style = buf[i][j] - '0';
@@ -148,7 +148,7 @@ void Command::initMap()
 			if (start_id == end_id) {
 				continue;
 			}
-			if ((start.product_object & end.need_object) == 0) {
+			if ((start.product_object & end.need_object) == 0) {	//	前面生产的是后面需要的，此路线才有效
 				continue;
 			}
 			route temp(start_id, end_id);
@@ -251,7 +251,7 @@ void Command::UpdateInfo()
 
 void Command::RobotDoWork()
 {
-	if (stat == WRONG) {
+	if (stat == WRONG) {	//	状态错误时，清空机器人物品
 		for (int i = 0; i < robots.size(); ++i) {
 			string first = "", second = "", third = "";
 			first += "forward ";
@@ -279,7 +279,7 @@ void Command::RobotDoWork()
 		if (!rt.on_job) {
 			continue;
 		}
-		if (rt.can_buy) {
+		if (rt.can_buy) {	//	能购买（靠近目标工作台）
 			string temp = "";
 			temp += "buy ";
 			temp += to_string(i);
@@ -289,7 +289,7 @@ void Command::RobotDoWork()
 			puton_product_stat(rt.cur.start);
 		}
 
-		if (rt.can_sell) {
+		if (rt.can_sell) {	//	能出售
 			string temp = "";
 			temp += "sell ";
 			temp += to_string(i);
@@ -326,8 +326,8 @@ void Command::RobotDoWork()
 		double speed, angle;
 		double x = next.real_pos.second - rt.real_pos.second,
 			y = next.real_pos.first - rt.real_pos.first;
-		double target_angle = atan2(y, x);
-		double a_diff = target_angle + (-rt.face);
+		double target_angle = atan2(y, x);	//	计算目标角度与x正半轴夹角
+		double a_diff = target_angle + (-rt.face);	//	计算目标角度与朝向的差值
 		if (a_diff > M_PI) {
 			a_diff -= 2 * M_PI;
 		}
@@ -374,24 +374,51 @@ void Command::RobotDoWork()
 
 void Command::RobotSelectWork()
 {
-	for () {
+	for (int i = 0; i < robots.size(); i++) {
 		//判断当前机器人是否有工作
 		//拿到当前机器人的坐标，
 		//遍历可选的路线，统计可选路线各个的长度
 		//first：总长度，second：路线
-		pair<double, route>;
-		for () {
+		robot rb = robots[i];
+		if (rb.state != NONE) continue;	// 当前机器人没有分配工作
 
+		pair<double, double> pos = rb.real_pos;
+		pair<double, route> ;
+
+		//	寻找maxValue和maxDistance，方便归一化以及正向化
+		double maxValue = 0, maxDistance = 0;
+		for (auto &cur_route:avaliable) {
+			worker route_start_worker = idToworker[cur_route.start];
+			pair<double, double> cur_worker_pos = route_start_worker.real_pos;
+			double distance = GetLength(rb.real_pos, cur_worker_pos);	//	计算机器人到起始点距离
+			distance += cur_route.length;
+			maxValue = max(maxValue, cur_route.value);
+			maxDistance = max(maxDistance,distance);
 		}
-		//保存在这里
-		priority_queue;
+		//	将归一化和正向化之后的指标加权赋分给路线，然后放进priority_queue
+		priority_queue<pair<double,route>> pq;	//	！这边以double升序
+		for (auto& cur_route : avaliable) {
+			worker route_start_worker = idToworker[cur_route.start];
+			pair<double, double> cur_worker_pos = route_start_worker.real_pos;
+			double distance = GetLength(rb.real_pos, cur_worker_pos);	//	计算机器人到起始点距离
+			distance += cur_route.length;
+			distance = distance / maxDistance;	//路线越小越好，这是一个极小型指标
+			maxValue = cur_route.value / maxValue;
+			double score = distance * 0.5 + maxValue * 0.5;	//	权重都置0.5
+			pq.push(make_pair(score, cur_route));	//选中的路线给它评分，越小越好，进堆	
+		}
+		
+
+		pair<double, route> my_route = pq.top();
+		pq.pop();
+
 		//你取出来了这个路线
 		//start,end
-		//puton_occ_stat(start);
-		//puton_occ_stat(end, route.object);
-		//flush_list();
-		// 
-		//robot.cur = route;
+		//刷新路线
+		puton_occ_stat(my_route.second.start);
+		puton_occ_stat(my_route.second.end, my_route.second.object);
+		flush_list();
+		rb.cur = my_route.second; 
 	}
 }
 
@@ -407,11 +434,13 @@ void Command::realTomap(pair<double, double> old, pair<int, int>& ret)
 	ret.second = (old.second - 0.25) * 2;
 }
 
+//	算两个点之间的距离
 double Command::GetLength(const pair<double, double>& lhs, const pair<double, double>& rhs) {
 	double x = lhs.first - rhs.first, y = lhs.second - rhs.second;
 	return sqrt(x * x + y * y);
 }
 
+//	清除avaliable，重置unavaliable
 void Command::Clean_list() {
 	for (auto p = avaliable.begin(); p != avaliable.end();) {
 		unavaliable.insert(unavaliable.end(), *p);
@@ -422,6 +451,7 @@ void Command::Clean_list() {
 	}
 }
 
+//	更新被选中的路线
 void Command::flush_list() {
 	for (auto p = avaliable.begin(); p != avaliable.end();) {
 		if (p->stat != 0) {
