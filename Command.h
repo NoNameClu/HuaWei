@@ -6,7 +6,7 @@
 #include <queue>
 #include <list>
 #include <vector>
-#include <string>
+#include <string.h>
 #include "math.h"
 #include<sstream>
 

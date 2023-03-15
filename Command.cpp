@@ -1,6 +1,6 @@
 #include "Command.h"
 
-#define DEBUG
+//#define DEBUG
 
 const unordered_set<int> Command::style{ 1,2,3,4,5,6,7,8,9 };
 
@@ -72,6 +72,7 @@ void Command::Response()
 #endif // DEBUG
 
 	}
+	fflush(stdout);
 }
 
 void Command::initMap()
@@ -81,21 +82,21 @@ void Command::initMap()
 #endif
 
 	//循环地图数据，先保存下所有工作台和机器人的初始位置，此处默认缓冲区buf末尾没有ok。
-	for (int i = 0; i < 100; ++i) {
-		for (int j = 0; j < 100; ++j) {
-			if (buf[i][j] == 'A') {		// 机器人
+	for (int j = 99; j >= 0; --j) {
+		for (int i = 0; i < 100; ++i) {
+			if (buf[j][i] == 'A') {		// 机器人
 				robot temp;
 				temp.state = NONE;
 				robots.push_back(temp);
 			}
-			if (style.find(buf[i][j] - '0') != style.end()) {	// 工作台
+			if (style.find(buf[j][i] - '0') != style.end()) {	// 工作台
 				worker temp;
-				pair<int, int> pos = make_pair(i, j);	//	工作台int坐标
+				pair<int, int> pos = make_pair(i, 99 - j);	//	工作台int坐标
 				pair<double, double> real_pos;
 				mapToreal(pos, real_pos);				//	int坐标转double实际坐标
 				temp.pos = pos;
 				temp.real_pos = real_pos;
-				temp.style = buf[i][j] - '0';
+				temp.style = buf[j][i] - '0';
 				switch (temp.style) {
 				case 1:
 					temp.need_money = 3000;
@@ -151,11 +152,16 @@ void Command::initMap()
 				default:
 					break;
 				}
-				idToworker[i * 100 + j] = temp;
+				idToworker[i * 100 + (99 - j)] = temp;
 			}
 		}
 	}
 
+#ifdef DEBUG
+	for (const auto& a : idToworker) {
+		cerr << a.second.real_pos.first << " " << a.second.real_pos.second << " " << a.second.style << " " << a.second.pos.first << " " << a.second.pos.second << endl;
+	}
+#endif
 	//循环判断计算路径
 	for (auto& p : idToworker) {
 		int start_id = p.first;
@@ -175,7 +181,7 @@ void Command::initMap()
 			if (end.style >= 4 && end.style <= 6) {
 				temp.value += (end.sell_money - end.need_money) / 2;
 			}
-			else if(end.style ) {
+			else if(end.style == 7) {
 				temp.value += (end.sell_money - end.need_money) / 3;
 			}
 			temp.object = start.product_object;
@@ -220,10 +226,10 @@ void Command::UpdateInfo()
 #endif // DEBUG
 
 
-	if (m_temp != money) {
+	/*if (m_temp != money) {
 		stat = WRONG;
 		Clean_list();
-	}
+	}*/
 
 #ifdef DEBUG
 	cerr << (stat == WRONG ? "wrong" : "normal") << endl;
@@ -336,6 +342,7 @@ void Command::UpdateInfo()
 				robots[i].can_sell = true;
 			}
 		}
+
 		if (robots[i].l_speed.first != 0 || robots[i].l_speed.second != 0 || robots[i].a_speed != 0) {
 			flag = false;
 		}
@@ -588,13 +595,13 @@ void Command::RobotSelectWork()
 void Command::mapToreal(pair<int, int> old, pair<double, double>& ret)
 {
 	ret.first = static_cast<double>(old.first) / 2 + 0.25;
-	ret.second = 50 - (static_cast<double>(old.second) / 2 + 0.25);
+	ret.second = (static_cast<double>(old.second) / 2 + 0.25);
 }
 
 void Command::realTomap(pair<double, double> old, pair<int, int>& ret)
 {
 	ret.first = (old.first - 0.25) * 2;
-	ret.second = 99 - (old.second - 0.25) * 2;
+	ret.second = (old.second - 0.25) * 2;
 }
 
 //	算两个点之间的距离
