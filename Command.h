@@ -10,6 +10,7 @@
 #include "math.h"
 #include<sstream>
 
+
 using namespace std;
 
 const int OBJECT_NULL = 1;	// 修改 重名了
