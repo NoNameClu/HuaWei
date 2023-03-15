@@ -69,7 +69,7 @@ void Command::initMap()
 				temp.state = NONE;
 				robots.push_back(temp);
 			}
-			if (style.find(buf[i][j] - '0') != style.end()) {	// 机器人
+			if (style.find(buf[i][j] - '0') != style.end()) {	// 工作台
 				worker temp;
 				pair<int, int> pos = make_pair(i, j);	//	工作台int坐标
 				pair<double, double> real_pos;
@@ -138,7 +138,6 @@ void Command::initMap()
 	}
 
 	//循环判断计算路径
-	double max_value = 0;
 	for (auto& p : idToworker) {
 		int start_id = p.first;
 		worker start = p.second;
@@ -160,17 +159,11 @@ void Command::initMap()
 			else if(end.style ) {
 				temp.value += (end.sell_money - end.need_money) / 3;
 			}
-			max_value = max(temp.value, max_value);
 			temp.object = start.product_object;
 			temp.length = GetLength(start.real_pos, end.real_pos);
-			temp.stat = NO_PRODUCT;
+			temp.stat = NO_PRODUCT | NO_NEED;
 			unavaliable.push_back(temp);
 		}
-	}
-
-	//先对收益归一化
-	for (auto& rou : unavaliable) {
-		rou.value /= max_value;		//0 - 1 小数
 	}
 }
 
@@ -210,7 +203,7 @@ void Command::UpdateInfo()
 		sa >> real_pos.first;
 		sa >> real_pos.second;
 		tmp.real_pos = real_pos;	//	坐标转化
-		mapToreal(tmp.pos, tmp.real_pos); 
+		realTomap(tmp.real_pos, tmp.pos); 
 
 		int time;
 		sa >> time;		// 工作台剩余的生产时间（没有用到）
@@ -218,13 +211,14 @@ void Command::UpdateInfo()
 		sa >> tmp.hold_object;
 		sa >> tmp.output;
 		int id = tmp.pos.first * 100 + tmp.pos.second;
-		worker tmp2 = idToworker[id];	// tmp2记录了此工作台上一帧的状态，但还没有与当前帧比较判错
+		// tmp2记录了此工作台上一帧的状态，但还没有与当前帧比较判错
 		if (tmp.output) {
 			takeoff_product_stat(id);
 		}
 		idToworker[id] = tmp;
 	}
 
+	bool flag = true;
 	for (int i = 0; i < 4; i++) {
 		a = buf[index++];
 		sa << a;
@@ -257,6 +251,13 @@ void Command::UpdateInfo()
 				robots[i].can_sell = true;
 			}
 		}
+		if (robots[i].l_speed.first != 0 || robots[i].l_speed.second != 0 || robots[i].a_speed != 0) {
+			flag = false;
+		}
+	}
+
+	if (flag && stat == WRONG) {
+		stat = NORMAL;
 	}
 
 	takeoff_need_stat();
@@ -344,7 +345,7 @@ void Command::RobotDoWork()
 		//找到了目标
 		double speed, angle;
 		double x = next.real_pos.second - rt.real_pos.second,
-			y = next.real_pos.first - rt.real_pos.first;
+			y = -(next.real_pos.first - rt.real_pos.first);
 		double target_angle = atan2(y, x);	//	计算目标角度与x正半轴夹角
 		double a_diff = target_angle + (-rt.face);	//	计算目标角度与朝向的差值
 		if (a_diff > M_PI) {
@@ -400,10 +401,8 @@ void Command::RobotSelectWork()
 		//遍历可选的路线，统计可选路线各个的长度
 		//first：总长度，second：路线
 		robot rb = robots[i];
-		if (rb.state != NONE) continue;	// 当前机器人没有分配工作
+		if (rb.on_job) continue;	// 当前机器人没有分配工作
 
-		pair<double, double> pos = rb.real_pos;
-		pair<double, route> ;
 
 		//	寻找maxValue和maxDistance，方便归一化以及正向化
 		double maxValue = 0, maxDistance = 0;
@@ -416,8 +415,13 @@ void Command::RobotSelectWork()
 			maxDistance = max(maxDistance,distance);
 		}
 		//	将归一化和正向化之后的指标加权赋分给路线，然后放进priority_queue
-		priority_queue<pair<double,route>> pq;	//	！这边以double升序
-		for (auto& cur_route : avaliable) {
+
+		auto cmp = [](const pair<double, route>& lhs, const pair<double, route>& rhs) {
+			return lhs.first < rhs.first;
+		};
+
+		priority_queue<pair<double, route>, vector<pair<double, route>>, decltype(cmp)> pq(cmp);	//	！这边以double升序
+		for (auto cur_route : avaliable) {
 			worker route_start_worker = idToworker[cur_route.start];
 			pair<double, double> cur_worker_pos = route_start_worker.real_pos;
 			double distance = GetLength(rb.real_pos, cur_worker_pos);	//	计算机器人到起始点距离
@@ -428,6 +432,9 @@ void Command::RobotSelectWork()
 			pq.push(make_pair(score, cur_route));	//选中的路线给它评分，越小越好，进堆	
 		}
 		
+		if (pq.empty()) {
+			return;
+		}
 
 		pair<double, route> my_route = pq.top();
 		pq.pop();
@@ -439,7 +446,7 @@ void Command::RobotSelectWork()
 		puton_occ_stat(my_route.second.end, my_route.second.object);
 		flush_list();
 		rb.cur = my_route.second; 
-		
+		rb.on_job = true;
 	}
 }
 
