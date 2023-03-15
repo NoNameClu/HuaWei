@@ -57,7 +57,7 @@ struct route {
 	int object;						//当前路线操作的物品
 	int stat;						//表示当前路线的状态
 
-	route() {};
+	route() = default;
 	route(int s, int e) : start(s), end(e) {};
 };
 
@@ -110,6 +110,7 @@ class Command
 	void mapToreal(pair<int, int>, pair<double, double>&);
 	void realTomap(pair<double, double>, pair<int, int>&);
 	double GetLength(const pair<double, double>&, const pair<double, double>&);
+	bool isNear(const pair<double, double>&, const pair<double, double>&, double);
 
 	void Clean_list();
 	void flush_list();

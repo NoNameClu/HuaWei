@@ -249,6 +249,14 @@ void Command::UpdateInfo()
 		robots[i].a_speed = a_speed;
 		robots[i].l_speed = l_speed;
 		robots[i].real_pos = real_pos;
+		if (robots[i].on_job) {
+			if (robots[i].state == BEFORE && isNear(robots[i].real_pos, idToworker[robots[i].cur.start].real_pos, 0.45)) {
+				robots[i].can_buy = true;
+			}
+			if (robots[i].state == AFTER && isNear(robots[i].real_pos, idToworker[robots[i].cur.end].real_pos, 0.53)) {
+				robots[i].can_sell = true;
+			}
+		}
 	}
 
 	takeoff_need_stat();
@@ -285,25 +293,32 @@ void Command::RobotDoWork()
 		if (!rt.on_job) {
 			continue;
 		}
-		if (rt.can_buy) {	//	能购买（靠近目标工作台）
+		if (rt.can_buy && rt.state == BEFORE) {	//	能购买（靠近目标工作台）
 			string temp = "";
 			temp += "buy ";
 			temp += to_string(i);
 			response.push_back(temp);
+
 			rt.state = AFTER;
+			rt.can_buy = false;
 			money -= rt.cur.base;
+
+			flush_money_stat();
 			puton_product_stat(rt.cur.start);
 		}
 
-		if (rt.can_sell) {	//	能出售
+		if (rt.can_sell && rt.state == AFTER) {	//	能出售
 			string temp = "";
 			temp += "sell ";
 			temp += to_string(i);
 			response.push_back(temp);
+
 			rt.state = NONE;
+			rt.can_sell = false;
 			rt.on_job = false;
-			auto temp_worker = idToworker[rt.cur.end];
 			money += rt.cur.value + rt.cur.base;
+
+			flush_money_stat();
 			puton_need_stat(rt.cur.end, rt.cur.object);
 		}
 
@@ -444,6 +459,14 @@ void Command::realTomap(pair<double, double> old, pair<int, int>& ret)
 double Command::GetLength(const pair<double, double>& lhs, const pair<double, double>& rhs) {
 	double x = lhs.first - rhs.first, y = lhs.second - rhs.second;
 	return sqrt(x * x + y * y);
+}
+
+bool Command::isNear(const pair<double, double>& lhs, const pair<double, double>& rhs, double dis)
+{
+	if (GetLength(lhs, rhs) <= dis) {
+		return true;
+	}
+	return false;
 }
 
 //	清除avaliable，重置unavaliable
