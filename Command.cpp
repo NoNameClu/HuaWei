@@ -154,6 +154,12 @@ void Command::initMap()
 			route temp(start_id, end_id);
 			temp.base = start.need_money;
 			temp.value = start.sell_money - start.need_money;
+			if (end.style >= 4 && end.style <= 6) {
+				temp.value += (end.sell_money - end.need_money) / 2;
+			}
+			else if(end.style ) {
+				temp.value += (end.sell_money - end.need_money) / 3;
+			}
 			max_value = max(temp.value, max_value);
 			temp.object = start.product_object;
 			temp.length = GetLength(start.real_pos, end.real_pos);
@@ -449,6 +455,9 @@ void Command::flush_money_stat() {
 		if (p->base >= money) {
 			p->stat &= (~NO_MONEY);
 		}
+		if (p->base < money) {
+			p->stat |= NO_MONEY;
+		}
 	}
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
 		if (p->base < money) {
@@ -472,11 +481,24 @@ void Command::puton_product_stat(int id) {
 			p->stat |= NO_PRODUCT;
 		}
 	}
+
+	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
+		if (p->start == id) {
+			p->stat &= (~OCC);
+			p->stat |= NO_PRODUCT;
+		}
+	}
 }
 
 //start°æ±¾
 void Command::puton_occ_stat(int id) {
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
+		if (p->start == id) {
+			p->stat |= OCC;
+		}
+	}
+
+	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		if (p->start == id) {
 			p->stat |= OCC;
 		}
@@ -490,10 +512,23 @@ void Command::puton_occ_stat(int id, int object) {
 			p->stat |= OCC;
 		}
 	}
+
+	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
+		if (p->end == id && p->object == object) {
+			p->stat |= OCC;
+		}
+	}
 }
 
 void Command::puton_need_stat(int id, int object) {
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
+		if (p->end == id && p->object == object) {
+			p->stat &= (~OCC);
+			p->stat |= NO_NEED;
+		}
+	}
+
+	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		if (p->end == id && p->object == object) {
 			p->stat &= (~OCC);
 			p->stat |= NO_NEED;
