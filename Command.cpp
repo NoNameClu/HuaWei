@@ -439,6 +439,7 @@ void Command::RobotSelectWork()
 		puton_occ_stat(my_route.second.end, my_route.second.object);
 		flush_list();
 		rb.cur = my_route.second; 
+		
 	}
 }
 
