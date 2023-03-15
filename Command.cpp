@@ -423,7 +423,7 @@ void Command::RobotSelectWork()
 			double distance = GetLength(rb.real_pos, cur_worker_pos);	//	计算机器人到起始点距离
 			distance += cur_route.length;
 			distance = distance / maxDistance;	//路线越小越好，这是一个极小型指标
-			maxValue = cur_route.value / maxValue;
+			maxValue = 1 - cur_route.value / maxValue;	// 价值越大越好，这一个极大型指标，需要正向化
 			double score = distance * 0.5 + maxValue * 0.5;	//	权重都置0.5
 			pq.push(make_pair(score, cur_route));	//选中的路线给它评分，越小越好，进堆	
 		}
