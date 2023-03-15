@@ -303,7 +303,6 @@ void Command::RobotDoWork()
 			rt.can_buy = false;
 			money -= rt.cur.base;
 
-			flush_money_stat();
 			puton_product_stat(rt.cur.start);
 		}
 
@@ -317,8 +316,7 @@ void Command::RobotDoWork()
 			rt.can_sell = false;
 			rt.on_job = false;
 			money += rt.cur.value + rt.cur.base;
-
-			flush_money_stat();
+			
 			puton_need_stat(rt.cur.end, rt.cur.object);
 		}
 
@@ -390,6 +388,7 @@ void Command::RobotDoWork()
 		response.push_back(ro);
 	}
 
+	flush_money_stat();
 	flush_list();
 }
 
