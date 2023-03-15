@@ -81,7 +81,7 @@ void Command::initMap()
 #endif
 
 	//循环地图数据，先保存下所有工作台和机器人的初始位置，此处默认缓冲区buf末尾没有ok。
-	for (int i = 0; i < 100; ++i) {
+	for (int i = buf.size()-1; i >=0; i--) {	//	从最后一行往上建立地图
 		for (int j = 0; j < 100; ++j) {
 			if (buf[i][j] == 'A') {		// 机器人
 				robot temp;
@@ -90,7 +90,7 @@ void Command::initMap()
 			}
 			if (style.find(buf[i][j] - '0') != style.end()) {	// 工作台
 				worker temp;
-				pair<int, int> pos = make_pair(i, j);	//	工作台int坐标
+				pair<int, int> pos = make_pair(buf.size()-1-i, j);	//	工作台int坐标
 				pair<double, double> real_pos;
 				mapToreal(pos, real_pos);				//	int坐标转double实际坐标
 				temp.pos = pos;
