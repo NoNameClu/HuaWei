@@ -476,7 +476,7 @@ void Command::Clean_list() {
 		p = avaliable.erase(p);
 	}
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
-		p->stat = NO_PRODUCT;
+		p->stat = NO_PRODUCT | NO_NEED;
 	}
 }
 
