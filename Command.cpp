@@ -1,5 +1,7 @@
 #include "Command.h"
 
+#define DEBUG
+
 const unordered_set<int> Command::style{ 1,2,3,4,5,6,7,8,9 };
 
 void Command::init()
@@ -26,12 +28,21 @@ void Command::start()
 
 bool Command::ReadUntilOK()
 {
+#ifdef DEBUG
+	cerr << "开始读帧" << endl;
+#endif // DEBUG
+
 	string line;
 	while (getline(cin, line)) {
 		if (line[0] == 'O' && line[1] == 'K')
 			return true;
 
 		buf.push_back(line);
+
+#ifdef DEBUG
+		//cerr << line << endl;
+#endif // DEBUG
+
 	}
 	return false;
 }
@@ -56,14 +67,22 @@ void Command::Response()
 {
 	for (const auto& res : response) {
 		cout << res << endl;
+#ifdef DEBUG
+		cerr << res << endl;
+#endif // DEBUG
+
 	}
 }
 
 void Command::initMap()
 {
+#ifdef DEBUG
+	cerr << "来到initmap函数" << endl;
+#endif
+
 	//循环地图数据，先保存下所有工作台和机器人的初始位置，此处默认缓冲区buf末尾没有ok。
-	for (int i = 0; i < buf.size(); ++i) {
-		for (int j = 0; j < buf[0].size(); ++j) {
+	for (int i = 0; i < 100; ++i) {
+		for (int j = 0; j < 100; ++j) {
 			if (buf[i][j] == 'A') {		// 机器人
 				robot temp;
 				temp.state = NONE;
@@ -161,82 +180,148 @@ void Command::initMap()
 			}
 			temp.object = start.product_object;
 			temp.length = GetLength(start.real_pos, end.real_pos);
-			temp.stat = NO_PRODUCT | NO_NEED;
+			temp.stat = NO_PRODUCT ;
 			unavaliable.push_back(temp);
 		}
 	}
+
+#ifdef DEBUG
+	cerr << "总共有" << unavaliable.size() << "路径" << endl;
+#endif // DEBUG
+
+
 }
 
 void Command::UpdateInfo()
 {
+#ifdef DEBUG
+	cerr << "来到UpdateInfo函数" << endl;
+#endif // DEBUG
+
 	string a;
-	stringstream sa;
 
 	//	读第一行
 	int index = 0;
 	a = buf[index++];
-	sa << a;
+	stringstream sa;
+	sa.str(a);
 	sa >> frame;
+
+#ifdef DEBUG
+	cerr << frame << endl;
+#endif // DEBUG
+
+
 	int m_temp;
 	sa >> m_temp;
+
+#ifdef DEBUG
+	cerr << m_temp << endl;
+#endif // DEBUG
+
+
 	if (m_temp != money) {
 		stat = WRONG;
 		Clean_list();
 	}
+
+#ifdef DEBUG
+	cerr << (stat == WRONG ? "wrong" : "normal") << endl;
+#endif // DEBUG
+
+
 	money = m_temp;
 	flush_money_stat();
 
 	//	读第二行
 	a = buf[index++];
-	sa << a;
-	sa >> worker_num;
+
+#ifdef DEBUG
+	//cerr << buf[index - 1] << endl;
+#endif // DEBUG
+
+	stringstream sb(a);
+	sb >> worker_num;
+
+#ifdef DEBUG
+	cerr << "更新工作台前" << endl;
+	//cerr << buf.size() << endl;
+	//cerr << worker_num << endl;
+#endif // DEBUG
+
 
 	int n = worker_num;
+
+#ifdef DEBUG
+	//cerr << n << endl;
+#endif // DEBUG
+
+
 	while (n--) {
 		//	读第3到n+3行
 		a = buf[index++];
-		sa << a;
+		stringstream s_for;
+		s_for.str(a);
 
 		worker tmp;
-		sa >> tmp.style;
+		s_for >> tmp.style;
 		pair<double, double> real_pos;
-		sa >> real_pos.first;
-		sa >> real_pos.second;
+		s_for >> real_pos.first;
+		s_for >> real_pos.second;
 		tmp.real_pos = real_pos;	//	坐标转化
 		realTomap(tmp.real_pos, tmp.pos); 
 
 		int time;
-		sa >> time;		// 工作台剩余的生产时间（没有用到）
+		s_for >> time;		// 工作台剩余的生产时间（没有用到）
 		tmp.time = time;
-		sa >> tmp.hold_object;
-		sa >> tmp.output;
+		s_for >> tmp.hold_object;
+		s_for >> tmp.output;
+
+#ifdef DEBUG
+		//cerr << tmp.real_pos.first << " " << tmp.real_pos.second << " " << tmp.hold_object << " " << tmp.output << endl;
+#endif // DEBUG
+
+
 		int id = tmp.pos.first * 100 + tmp.pos.second;
 		// tmp2记录了此工作台上一帧的状态，但还没有与当前帧比较判错
 		if (tmp.output) {
+
+#ifdef DEBUG
+			//cerr << "脱掉product的束缚" << endl;
+#endif // DEBUG
+
+
 			takeoff_product_stat(id);
 		}
 		idToworker[id] = tmp;
 	}
 
 	bool flag = true;
+
+#ifdef DEBUG
+	cerr << "更新机器人之前" << endl;
+#endif // DEBUG
+
+
 	for (int i = 0; i < 4; i++) {
 		a = buf[index++];
-		sa << a;
+		stringstream s_for;
+		s_for.str(a);
 
 		int workerID;
-		sa >> workerID;
+		s_for >> workerID;
 		int item;
-		sa >> item;
+		s_for >> item;
 
 		double time_weight, collide_weight;		// 时间价值系数和碰撞价值系数，没有用上
-		sa >> time_weight;
-		sa >> collide_weight;
+		s_for >> time_weight;
+		s_for >> collide_weight;
 
 		double a_speed,face;
 		pair<double, double> l_speed, real_pos;
-		sa >> a_speed >> l_speed.first >> l_speed.second;
-		sa >> face;
-		sa >> real_pos.first >> real_pos.second;
+		s_for >> a_speed >> l_speed.first >> l_speed.second;
+		s_for >> face;
+		s_for >> real_pos.first >> real_pos.second;
 		
 		//robots[i].on_job = item > 0;	// 携带物品编号大于0就表示在工作中
 		robots[i].face = face;			// 更新机器人信息
@@ -244,10 +329,10 @@ void Command::UpdateInfo()
 		robots[i].l_speed = l_speed;
 		robots[i].real_pos = real_pos;
 		if (robots[i].on_job) {
-			if (robots[i].state == BEFORE && isNear(robots[i].real_pos, idToworker[robots[i].cur.start].real_pos, 0.45)) {
+			if (robots[i].state == BEFORE && isNear(robots[i].real_pos, idToworker[robots[i].cur.start].real_pos, 0.4)) {
 				robots[i].can_buy = true;
 			}
-			if (robots[i].state == AFTER && isNear(robots[i].real_pos, idToworker[robots[i].cur.end].real_pos, 0.53)) {
+			if (robots[i].state == AFTER && isNear(robots[i].real_pos, idToworker[robots[i].cur.end].real_pos, 0.4)) {
 				robots[i].can_sell = true;
 			}
 		}
@@ -266,6 +351,10 @@ void Command::UpdateInfo()
 
 void Command::RobotDoWork()
 {
+#ifdef DEBUG
+	cerr << "来到dowork函数" << endl;
+#endif // DEBUG
+
 	if (stat == WRONG) {	//	状态错误时，清空机器人物品
 		for (int i = 0; i < robots.size(); ++i) {
 			string first = "", second = "", third = "";
@@ -282,27 +371,37 @@ void Command::RobotDoWork()
 			response.push_back(first);
 			response.push_back(second);
 			response.push_back(third);
+			robots[i].can_buy = false;
+			robots[i].can_sell = false;
 		}
 		return;
 	}
 
-	worker next;
-	string fd, ro;
 	//循环判断哪些robot已经被选择了路线
 	for (int i = 0; i < robots.size(); ++i) {
+		worker next;
+		string fd, ro;
 		robot rt = robots[i];
+#ifdef DEBUG
+		//cerr << "机器人" << i << endl;
+#endif // DEBUG
+
 		if (!rt.on_job) {
 			continue;
 		}
+#ifdef DEBUG
+		//cerr << "机器人" << i << "开始工作" << endl;
+#endif // DEBUG
+
 		if (rt.can_buy && rt.state == BEFORE) {	//	能购买（靠近目标工作台）
 			string temp = "";
 			temp += "buy ";
 			temp += to_string(i);
 			response.push_back(temp);
 
-			rt.state = AFTER;
-			rt.can_buy = false;
-			money -= rt.cur.base;
+			robots[i].state = AFTER;
+			robots[i].can_buy = false;
+			money -= robots[i].cur.base;
 
 			puton_product_stat(rt.cur.start);
 		}
@@ -313,10 +412,10 @@ void Command::RobotDoWork()
 			temp += to_string(i);
 			response.push_back(temp);
 
-			rt.state = NONE;
-			rt.can_sell = false;
-			rt.on_job = false;
-			money += rt.cur.value + rt.cur.base;
+			robots[i].state = NONE;
+			robots[i].can_sell = false;
+			robots[i].on_job = false;
+			money += robots[i].cur.value + robots[i].cur.base;
 			
 			puton_need_stat(rt.cur.end, rt.cur.object);
 		}
@@ -342,11 +441,16 @@ void Command::RobotDoWork()
 			return;
 		}
 
+#ifdef DEBUG
+		//cerr << "机器人" << i << "开始工作" << endl;
+#endif // DEBUG
+
+
 		//找到了目标
 		double speed, angle;
 		double x = next.real_pos.second - rt.real_pos.second,
-			y = -(next.real_pos.first - rt.real_pos.first);
-		double target_angle = atan2(y, x);	//	计算目标角度与x正半轴夹角
+			y = (next.real_pos.first - rt.real_pos.first);
+		double target_angle = atan2(x, y);	//	计算目标角度与x正半轴夹角
 		double a_diff = target_angle + (-rt.face);	//	计算目标角度与朝向的差值
 		if (a_diff > M_PI) {
 			a_diff -= 2 * M_PI;
@@ -356,18 +460,30 @@ void Command::RobotDoWork()
 		}
 		int dir = a_diff > 0 ? 1 : -1;
 		a_diff = abs(a_diff);
+
+#ifdef DEBUG
+		cerr << GetLength(rt.real_pos, next.real_pos) << "机器人" << i << endl;
+		cerr << "目的地是" << next.real_pos.first << " " << next.real_pos.second << "机器人在" << rt.real_pos.first << " " << rt.real_pos.second << endl;
+		cerr << "偏角是" << a_diff * (180 / M_PI) << endl;;
+#endif // DEBUG
+
+
 		//当机器人和目标地点偏角很大
 		if (a_diff >= M_PI_2) {
-			speed = 0.5;
+			speed = 0.1;
 			angle = M_PI * dir;
 		}
 		//当机器人和目标地点偏角较大
 		else if(a_diff >= M_PI_8) {
-			speed = 3;
-			angle = M_PI_4 * dir;
+			speed = 2;
+			angle = M_PI_2 * dir;
 		}
 		//做微调  
 		else if(a_diff >= M_PI_32) {
+			speed = 3;
+			angle = M_PI_8 * dir;
+		}
+		else if (a_diff >= M_PI_64) {
 			speed = 5;
 			angle = M_PI_16 * dir;
 		}
@@ -389,12 +505,24 @@ void Command::RobotDoWork()
 		response.push_back(ro);
 	}
 
-	flush_money_stat();
-	flush_list();
+flush_money_stat();
+flush_list();
 }
 
 void Command::RobotSelectWork()
 {
+#ifdef DEBUG
+	cerr << "来到select函数" << endl;
+	cerr << "有" << avaliable.size() << "条路径" << endl;
+#endif // DEBUG
+
+	if (stat == WRONG) {
+		for (int i = 0; i < robots.size(); ++i) {
+			robots[i].on_job = false;
+			return;
+		}
+	}
+
 	for (int i = 0; i < robots.size(); i++) {
 		//判断当前机器人是否有工作
 		//拿到当前机器人的坐标，
@@ -406,13 +534,13 @@ void Command::RobotSelectWork()
 
 		//	寻找maxValue和maxDistance，方便归一化以及正向化
 		double maxValue = 0, maxDistance = 0;
-		for (auto &cur_route:avaliable) {
+		for (auto& cur_route : avaliable) {
 			worker route_start_worker = idToworker[cur_route.start];
 			pair<double, double> cur_worker_pos = route_start_worker.real_pos;
 			double distance = GetLength(rb.real_pos, cur_worker_pos);	//	计算机器人到起始点距离
 			distance += cur_route.length;
 			maxValue = max(maxValue, cur_route.value);
-			maxDistance = max(maxDistance,distance);
+			maxDistance = max(maxDistance, distance);
 		}
 		//	将归一化和正向化之后的指标加权赋分给路线，然后放进priority_queue
 
@@ -431,7 +559,7 @@ void Command::RobotSelectWork()
 			double score = distance * 0.5 + maxValue * 0.5;	//	权重都置0.5
 			pq.push(make_pair(score, cur_route));	//选中的路线给它评分，越小越好，进堆	
 		}
-		
+
 		if (pq.empty()) {
 			return;
 		}
@@ -445,21 +573,28 @@ void Command::RobotSelectWork()
 		puton_occ_stat(my_route.second.start);
 		puton_occ_stat(my_route.second.end, my_route.second.object);
 		flush_list();
-		rb.cur = my_route.second; 
-		rb.on_job = true;
+		robots[i].cur = my_route.second;
+		robots[i].on_job = true;
+		robots[i].state = BEFORE;
+
+#ifdef DEBUG
+		cerr << "robot开始工作" << endl;
+#endif // DEBUG
+
+
 	}
 }
 
 void Command::mapToreal(pair<int, int> old, pair<double, double>& ret)
 {
 	ret.first = static_cast<double>(old.first) / 2 + 0.25;
-	ret.second = static_cast<double>(old.second) / 2 + 0.25;
+	ret.second = 50 - (static_cast<double>(old.second) / 2 + 0.25);
 }
 
 void Command::realTomap(pair<double, double> old, pair<int, int>& ret)
 {
 	ret.first = (old.first - 0.25) * 2;
-	ret.second = (old.second - 0.25) * 2;
+	ret.second = 99 - (old.second - 0.25) * 2;
 }
 
 //	算两个点之间的距离
@@ -483,7 +618,10 @@ void Command::Clean_list() {
 		p = avaliable.erase(p);
 	}
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
-		p->stat = NO_PRODUCT | NO_NEED;
+		p->stat = NO_PRODUCT;
+		if ((idToworker[p->end].hold_object & p->object) != 0){
+			p->stat |= NO_NEED;
+		}
 	}
 }
 
@@ -507,20 +645,33 @@ void Command::flush_list() {
 		else {
 			++p;
 		}
+#ifdef DEBUG
+		//cerr << p->stat << endl;
+#endif // DEBUG
 	}
+
+#ifdef DEBUG
+	cerr << "路线" << avaliable.size() << " " << unavaliable.size() << endl;
+	/*if (avaliable.size() == 0) {
+		for (const auto& p : unavaliable) {
+			cerr << "原因" << p.stat << endl;
+		}
+	}*/
+#endif // DEBUG
+
 }
 
 void Command::flush_money_stat() {
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
-		if (p->base >= money) {
+		if (p->base <= money) {
 			p->stat &= (~NO_MONEY);
 		}
-		if (p->base < money) {
+		if (p->base > money) {
 			p->stat |= NO_MONEY;
 		}
 	}
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
-		if (p->base < money) {
+		if (p->base > money) {
 			p->stat |= NO_MONEY;
 		}
 	}
