@@ -33,6 +33,9 @@ const int OCC_E = 1 << 4;
 
 const double lengthOneFrame = 0.13;
 
+const double VALUE_WEIGHT = 0.2;
+const double LENGTH_WEIGHT = 0.8;
+
 enum robot_state {
 	//添加none状态，表示现在没有分配工作
 	NONE,			

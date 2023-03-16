@@ -178,12 +178,12 @@ void Command::initMap()
 			route temp(start_id, end_id);
 			temp.base = start.need_money;
 			temp.value = start.sell_money - start.need_money;
-			/*if (end.style >= 4 && end.style <= 6) {
+			if (end.style >= 4 && end.style <= 6) {
 				temp.value += (end.sell_money - end.need_money) / 2;
 			}
 			else if(end.style == 7) {
 				temp.value += (end.sell_money - end.need_money) / 3;
-			}*/
+			}
 			temp.object = start.product_object;
 			temp.length = GetLength(start.real_pos, end.real_pos);
 			temp.stat = NO_PRODUCT ;
@@ -555,7 +555,7 @@ void Command::RobotSelectWork()
 			if ((lengthOneFrame * route_start_worker.time) > distance) {
 				continue;
 			}
-			distance += cur_route.length - lengthOneFrame * route_start_worker.time;
+			distance += cur_route.length;
 			maxValue = max(maxValue, cur_route.value);
 			maxDistance = max(maxDistance, distance);
 		}
@@ -564,7 +564,6 @@ void Command::RobotSelectWork()
 		auto cmp = [](const pair<double, route>& lhs, const pair<double, route>& rhs) {
 			return lhs.first > rhs.first;
 		};
-
 		priority_queue<pair<double, route>, vector<pair<double, route>>, decltype(cmp)> pq(cmp);	//	！这边以double升序
 		for (auto cur_route : avaliable) {
 			worker route_start_worker = idToworker[cur_route.start];
@@ -572,8 +571,9 @@ void Command::RobotSelectWork()
 			double distance = GetLength(rb.real_pos, cur_worker_pos);	//	计算机器人到起始点距离
 			distance += cur_route.length;
 			distance = distance / maxDistance;	//路线越小越好，这是一个极小型指标
-			maxValue = 1 - cur_route.value / maxValue;	// 价值越大越好，这一个极大型指标，需要正向化
-			double score = distance ;	//	权重都置0.5
+			double temp_value;
+			temp_value = 1 - cur_route.value / maxValue;	// 价值越大越好，这一个极大型指标，需要正向化
+			double score = temp_value * VALUE_WEIGHT + distance * LENGTH_WEIGHT;	//	权重都置0.5
 			pq.push(make_pair(score, cur_route));	//选中的路线给它评分，越小越好，进堆	
 		}
 #ifdef DEBUG
@@ -589,10 +589,11 @@ void Command::RobotSelectWork()
 			if ((lengthOneFrame * route_start_worker.time) > distance) {
 				continue;
 			}
-			distance += cur_route.length - lengthOneFrame * route_start_worker.time;
+			distance += cur_route.length;
 			distance = distance / maxDistance;	//路线越小越好，这是一个极小型指标
-			maxValue = 1 - cur_route.value / maxValue;	// 价值越大越好，这一个极大型指标，需要正向化
-			double score = distance;	//	权重都置0.5
+			double temp_value;
+			temp_value = 1 - cur_route.value / maxValue;	// 价值越大越好，这一个极大型指标，需要正向化
+			double score = temp_value * VALUE_WEIGHT + distance * LENGTH_WEIGHT;	//	权重都置0.5
 			pq.push(make_pair(score, cur_route));	//选中的路线给它评分，越小越好，进堆	
 		}
 
