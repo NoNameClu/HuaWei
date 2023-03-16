@@ -178,12 +178,12 @@ void Command::initMap()
 			route temp(start_id, end_id);
 			temp.base = start.need_money;
 			temp.value = start.sell_money - start.need_money;
-			if (end.style >= 4 && end.style <= 6) {
+			/*if (end.style >= 4 && end.style <= 6) {
 				temp.value += (end.sell_money - end.need_money) / 2;
 			}
 			else if(end.style == 7) {
 				temp.value += (end.sell_money - end.need_money) / 3;
-			}
+			}*/
 			temp.object = start.product_object;
 			temp.length = GetLength(start.real_pos, end.real_pos);
 			temp.stat = NO_PRODUCT ;
@@ -362,27 +362,27 @@ void Command::RobotDoWork()
 	cerr << "来到dowork函数" << endl;
 #endif // DEBUG
 
-	if (stat == WRONG) {	//	状态错误时，清空机器人物品
-		for (int i = 0; i < robots.size(); ++i) {
-			string first = "", second = "", third = "";
-			first += "forward ";
-			first += to_string(i);
-			first += " ";
-			first += to_string(0);
-			second += "rotate ";
-			second += to_string(i);
-			second += " ";
-			second += to_string(0);
-			third += "destroy ";
-			third += to_string(i);
-			response.push_back(first);
-			response.push_back(second);
-			response.push_back(third);
-			robots[i].can_buy = false;
-			robots[i].can_sell = false;
-		}
-		return;
-	}
+	//if (stat == WRONG) {	//	状态错误时，清空机器人物品
+	//	for (int i = 0; i < robots.size(); ++i) {
+	//		string first = "", second = "", third = "";
+	//		first += "forward ";
+	//		first += to_string(i);
+	//		first += " ";
+	//		first += to_string(0);
+	//		second += "rotate ";
+	//		second += to_string(i);
+	//		second += " ";
+	//		second += to_string(0);
+	//		third += "destroy ";
+	//		third += to_string(i);
+	//		response.push_back(first);
+	//		response.push_back(second);
+	//		response.push_back(third);
+	//		robots[i].can_buy = false;
+	//		robots[i].can_sell = false;
+	//	}
+	//	return;
+	//}
 
 	//循环判断哪些robot已经被选择了路线
 	for (int i = 0; i < robots.size(); ++i) {
@@ -408,7 +408,6 @@ void Command::RobotDoWork()
 
 			robots[i].state = AFTER;
 			robots[i].can_buy = false;
-			money -= robots[i].cur.base;
 
 			puton_product_stat(rt.cur.start);
 		}
@@ -422,7 +421,6 @@ void Command::RobotDoWork()
 			robots[i].state = NONE;
 			robots[i].can_sell = false;
 			robots[i].on_job = false;
-			money += robots[i].cur.value + robots[i].cur.base;
 			
 			puton_need_stat(rt.cur.end, rt.cur.object);
 		}
@@ -435,16 +433,6 @@ void Command::RobotDoWork()
 			next = idToworker[rt.cur.end];
 			break;
 		case NONE:
-			fd += "forward ";
-			fd += to_string(i);
-			fd += " ";
-			fd += to_string(0);
-			ro += "rotate ";
-			ro += to_string(i);
-			ro += " ";
-			ro += to_string(0);
-			response.push_back(fd);
-			response.push_back(ro);
 			return;
 		}
 
@@ -477,22 +465,22 @@ void Command::RobotDoWork()
 
 		//当机器人和目标地点偏角很大
 		if (a_diff >= M_PI_2) {
-			speed = 0.1;
+			speed = 0;
 			angle = M_PI * dir;
 		}
 		//当机器人和目标地点偏角较大
 		else if(a_diff >= M_PI_8) {
-			speed = 2;
-			angle = M_PI_2 * dir;
+			speed = 1;
+			angle = M_PI * dir;
 		}
 		//做微调  
 		else if(a_diff >= M_PI_32) {
-			speed = 3;
-			angle = M_PI_8 * dir;
+			speed = 2;
+			angle = M_PI_4 * dir;
 		}
 		else if (a_diff >= M_PI_64) {
 			speed = 5;
-			angle = M_PI_16 * dir;
+			angle = M_PI_8 * dir;
 		}
 		//前进
 		else {
@@ -523,6 +511,10 @@ void Command::RobotSelectWork()
 	cerr << "有" << avaliable.size() << "条路径" << endl;
 #endif // DEBUG
 
+	if (frame >= 8500) {
+		return;
+	}
+
 	if (stat == WRONG) {
 		for (int i = 0; i < robots.size(); ++i) {
 			robots[i].on_job = false;
@@ -549,10 +541,28 @@ void Command::RobotSelectWork()
 			maxValue = max(maxValue, cur_route.value);
 			maxDistance = max(maxDistance, distance);
 		}
+#ifdef DEBUG
+		cerr << "before maybe first" << endl;
+#endif // DEBUG
+
+		for (auto& cur_route : maybe_avaliable) {
+			if (idToworker[cur_route.start].time <= 0) {
+				continue;
+			}
+			worker route_start_worker = idToworker[cur_route.start];
+			pair<double, double> cur_worker_pos = route_start_worker.real_pos;
+			double distance = GetLength(rb.real_pos, cur_worker_pos); //	计算机器人到起始点距离
+			if ((lengthOneFrame * route_start_worker.time) > distance) {
+				continue;
+			}
+			distance += cur_route.length - lengthOneFrame * route_start_worker.time;
+			maxValue = max(maxValue, cur_route.value);
+			maxDistance = max(maxDistance, distance);
+		}
 		//	将归一化和正向化之后的指标加权赋分给路线，然后放进priority_queue
 
 		auto cmp = [](const pair<double, route>& lhs, const pair<double, route>& rhs) {
-			return lhs.first < rhs.first;
+			return lhs.first > rhs.first;
 		};
 
 		priority_queue<pair<double, route>, vector<pair<double, route>>, decltype(cmp)> pq(cmp);	//	！这边以double升序
@@ -563,9 +573,32 @@ void Command::RobotSelectWork()
 			distance += cur_route.length;
 			distance = distance / maxDistance;	//路线越小越好，这是一个极小型指标
 			maxValue = 1 - cur_route.value / maxValue;	// 价值越大越好，这一个极大型指标，需要正向化
-			double score = distance * 0.5 + maxValue * 0.5;	//	权重都置0.5
+			double score = distance ;	//	权重都置0.5
 			pq.push(make_pair(score, cur_route));	//选中的路线给它评分，越小越好，进堆	
 		}
+#ifdef DEBUG
+		cerr << "before maybe second" << endl;
+#endif // DEBUG
+		for (auto cur_route : maybe_avaliable) {
+			if (idToworker[cur_route.start].time <= 0) {
+				continue;
+			}
+			worker route_start_worker = idToworker[cur_route.start];
+			pair<double, double> cur_worker_pos = route_start_worker.real_pos;
+			double distance = GetLength(rb.real_pos, cur_worker_pos);	//	计算机器人到起始点距离
+			if ((lengthOneFrame * route_start_worker.time) > distance) {
+				continue;
+			}
+			distance += cur_route.length - lengthOneFrame * route_start_worker.time;
+			distance = distance / maxDistance;	//路线越小越好，这是一个极小型指标
+			maxValue = 1 - cur_route.value / maxValue;	// 价值越大越好，这一个极大型指标，需要正向化
+			double score = distance;	//	权重都置0.5
+			pq.push(make_pair(score, cur_route));	//选中的路线给它评分，越小越好，进堆	
+		}
+
+#ifdef DEBUG
+		cerr << "after maybe second" << endl;
+#endif // DEBUG
 
 		if (pq.empty()) {
 			return;
@@ -624,6 +657,12 @@ void Command::Clean_list() {
 		unavaliable.insert(unavaliable.end(), *p);
 		p = avaliable.erase(p);
 	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		unavaliable.insert(unavaliable.end(), *p);
+		p = maybe_avaliable.erase(p);
+	}
+
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		p->stat = NO_PRODUCT;
 		if ((idToworker[p->end].hold_object & p->object) != 0){
@@ -635,7 +674,11 @@ void Command::Clean_list() {
 //	更新被选中的路线
 void Command::flush_list() {
 	for (auto p = avaliable.begin(); p != avaliable.end();) {
-		if (p->stat != 0) {
+		if ((p->stat ^ NO_PRODUCT) == 0) {
+			maybe_avaliable.insert(maybe_avaliable.end(), *p);
+			p = avaliable.erase(p);
+		}
+		else if (p->stat != 0) {
 			unavaliable.insert(unavaliable.end(), *p);
 			p = avaliable.erase(p);
 		}
@@ -644,13 +687,31 @@ void Command::flush_list() {
 		}
 	}
 
-	for (auto p = unavaliable.begin(); p != unavaliable.end();) {
-		if (p->stat == 0) {
-			avaliable.insert(avaliable.end(), *p);
-			p = unavaliable.erase(p);
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end();) {
+		if ((p->stat ^ NO_PRODUCT) == 0) {
+			++p;
+		}
+		else if (p->stat != 0) {
+			unavaliable.insert(unavaliable.end(), *p);
+			p = maybe_avaliable.erase(p);
 		}
 		else {
+			avaliable.insert(avaliable.end(), *p);
+			p = maybe_avaliable.erase(p);
+		}
+	}
+
+	for (auto p = unavaliable.begin(); p != unavaliable.end();) {
+		if ((p->stat ^ NO_PRODUCT) == 0) {
+			maybe_avaliable.insert(maybe_avaliable.end(), *p);
+			p = unavaliable.erase(p);
+		}
+		else if (p->stat != 0) {
 			++p;
+		}
+		else {
+			avaliable.insert(avaliable.end(), *p);
+			p = unavaliable.erase(p);
 		}
 #ifdef DEBUG
 		//cerr << p->stat << endl;
@@ -677,6 +738,13 @@ void Command::flush_money_stat() {
 			p->stat |= NO_MONEY;
 		}
 	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		if (p->base > money) {
+			p->stat |= NO_MONEY;
+		}
+	}
+
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
 		if (p->base > money) {
 			p->stat |= NO_MONEY;
@@ -690,19 +758,25 @@ void Command::takeoff_product_stat(int id) {
 			p->stat &= (~NO_PRODUCT);
 		}
 	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		if (p->start == id) {
+			p->stat &= (~NO_PRODUCT);
+		}
+	}
 }
 
 void Command::puton_product_stat(int id) {
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
 		if (p->start == id) {
-			p->stat &= (~OCC);
+			p->stat &= (~OCC_S);
 			p->stat |= NO_PRODUCT;
 		}
 	}
 
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		if (p->start == id) {
-			p->stat &= (~OCC);
+			p->stat &= (~OCC_S);
 			p->stat |= NO_PRODUCT;
 		}
 	}
@@ -712,13 +786,19 @@ void Command::puton_product_stat(int id) {
 void Command::puton_occ_stat(int id) {
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
 		if (p->start == id) {
-			p->stat |= OCC;
+			p->stat |= OCC_S;
+		}
+	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		if (p->start == id) {
+			p->stat |= OCC_S;
 		}
 	}
 
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		if (p->start == id) {
-			p->stat |= OCC;
+			p->stat |= OCC_S;
 		}
 	}
 }
@@ -727,13 +807,19 @@ void Command::puton_occ_stat(int id) {
 void Command::puton_occ_stat(int id, int object) {
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
 		if (p->end == id && p->object == object) {
-			p->stat |= OCC;
+			p->stat |= OCC_E;
+		}
+	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		if (p->end == id && p->object == object) {
+			p->stat |= OCC_E;
 		}
 	}
 
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		if (p->end == id && p->object == object) {
-			p->stat |= OCC;
+			p->stat |= OCC_E;
 		}
 	}
 }
@@ -741,14 +827,21 @@ void Command::puton_occ_stat(int id, int object) {
 void Command::puton_need_stat(int id, int object) {
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
 		if (p->end == id && p->object == object) {
-			p->stat &= (~OCC);
+			p->stat &= (~OCC_E);
+			p->stat |= NO_NEED;
+		}
+	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		if (p->end == id && p->object == object) {
+			p->stat &= (~OCC_E);
 			p->stat |= NO_NEED;
 		}
 	}
 
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		if (p->end == id && p->object == object) {
-			p->stat &= (~OCC);
+			p->stat &= (~OCC_E);
 			p->stat |= NO_NEED;
 		}
 	}
