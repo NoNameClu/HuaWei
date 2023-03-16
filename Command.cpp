@@ -465,21 +465,21 @@ void Command::RobotDoWork()
 
 		//当机器人和目标地点偏角很大
 		if (a_diff >= M_PI_2) {
-			speed = 0;
+			speed = 1;
 			angle = M_PI * dir;
 		}
 		//当机器人和目标地点偏角较大
 		else if(a_diff >= M_PI_8) {
-			speed = 1;
+			speed = 2;
 			angle = M_PI * dir;
 		}
 		//做微调  
 		else if(a_diff >= M_PI_32) {
-			speed = 2;
+			speed = 3;
 			angle = M_PI_4 * dir;
 		}
 		else if (a_diff >= M_PI_64) {
-			speed = 5;
+			speed = 6;
 			angle = M_PI_8 * dir;
 		}
 		//前进
