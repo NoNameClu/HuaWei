@@ -1,6 +1,5 @@
 #include "Command.h"
 
-
 #define DEBUG
 
 const unordered_set<int> Command::style{ 1,2,3,4,5,6,7,8,9 };
@@ -114,7 +113,7 @@ void Command::initMap()
 					break;
 				case 3:
 					temp.need_money = 5800;
-					temp.sell_money = 9200; 
+					temp.sell_money = 9200;
 					temp.need_object = OBJECT_NULL;
 					temp.product_object = OBJECT_THREE;
 					break;
@@ -183,12 +182,12 @@ void Command::initMap()
 			if (end.style >= 4 && end.style <= 6) {
 				temp.value += (end.sell_money - end.need_money) / 2;
 			}
-			else if(end.style == 7) {
+			else if (end.style == 7) {
 				temp.value += (end.sell_money - end.need_money) / 3;
 			}
 			temp.object = start.product_object;
 			temp.length = GetLength(start.real_pos, end.real_pos);
-			temp.stat = NO_PRODUCT ;
+			temp.stat = NO_PRODUCT;
 			unavaliable.push_back(temp);
 		}
 	}
@@ -196,8 +195,6 @@ void Command::initMap()
 #ifdef DEBUG
 	cerr << "总共有" << unavaliable.size() << "路径" << endl;
 #endif // DEBUG
-
-
 }
 
 void Command::UpdateInfo()
@@ -276,7 +273,7 @@ void Command::UpdateInfo()
 		s_for >> real_pos.first;
 		s_for >> real_pos.second;
 		tmp.real_pos = real_pos;	//	坐标转化
-		realTomap(tmp.real_pos, tmp.pos); 
+		realTomap(tmp.real_pos, tmp.pos);
 
 		int time;
 		s_for >> time;		// 工作台剩余的生产时间（没有用到）
@@ -324,12 +321,12 @@ void Command::UpdateInfo()
 		s_for >> time_weight;
 		s_for >> collide_weight;
 
-		double a_speed,face;
+		double a_speed, face;
 		pair<double, double> l_speed, real_pos;
 		s_for >> a_speed >> l_speed.first >> l_speed.second;
 		s_for >> face;
 		s_for >> real_pos.first >> real_pos.second;
-		
+
 		//robots[i].on_job = item > 0;	// 携带物品编号大于0就表示在工作中
 		robots[i].face = face;			// 更新机器人信息
 		robots[i].a_speed = a_speed;
@@ -361,9 +358,9 @@ void Command::UpdateInfo()
 //	碰撞规避模块
 void Command::collision_avoidance()
 {
-	for (int i = 0; i < robots.size()-1; i++) {
+	for (int i = 0; i < robots.size() - 1; i++) {
 		robot rb1 = robots[i];
-		for (int j = i+1; j < robots.size(); j++) {
+		for (int j = i + 1; j < robots.size(); j++) {
 			robot rb2 = robots[j];
 			if (will_collision(rb1, rb2) == 1) {
 				//	旋转角，将rb1,rb2 旋转+30度
@@ -459,7 +456,7 @@ void Command::RobotDoWork()
 			robots[i].state = NONE;
 			robots[i].can_sell = false;
 			robots[i].on_job = false;
-			
+
 			puton_need_stat(rt.cur.end, rt.cur.object);
 		}
 
@@ -507,12 +504,12 @@ void Command::RobotDoWork()
 			angle = M_PI * dir;
 		}
 		//当机器人和目标地点偏角较大
-		else if(a_diff >= M_PI_8) {
+		else if (a_diff >= M_PI_8) {
 			speed = 2;
 			angle = M_PI * dir;
 		}
 		//做微调  
-		else if(a_diff >= M_PI_32) {
+		else if (a_diff >= M_PI_32) {
 			speed = 3;
 			angle = M_PI_4 * dir;
 		}
@@ -538,8 +535,8 @@ void Command::RobotDoWork()
 		response.push_back(ro);
 	}
 
-flush_money_stat();
-flush_list();
+	flush_money_stat();
+	flush_list();
 }
 
 void Command::RobotSelectWork()
@@ -708,7 +705,7 @@ void Command::Clean_list() {
 
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		p->stat = NO_PRODUCT;
-		if ((idToworker[p->end].hold_object & p->object) != 0){
+		if ((idToworker[p->end].hold_object & p->object) != 0) {
 			p->stat |= NO_NEED;
 		}
 	}
