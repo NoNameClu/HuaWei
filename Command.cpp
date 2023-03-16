@@ -211,7 +211,6 @@ void Command::UpdateInfo()
 	cerr << frame << endl;
 #endif // DEBUG
 
-
 	int m_temp;
 	sa >> m_temp;
 
@@ -347,6 +346,42 @@ void Command::UpdateInfo()
 
 	takeoff_need_stat();
 	flush_list();
+}
+
+
+//	碰撞规避模块
+void Command::collision_avoidance()
+{
+	for (int i = 0; i < robots.size()-1; i++) {
+		robot rb1 = robots[i];
+		for (int j = i+1; j < robots.size(); j++) {
+			robot rb2 = robots[j];
+			if (will_collision(rb1, rb2) == 1) {
+				//	旋转角，将rb1,rb2 旋转+30度
+
+			}
+			else if (will_collision(rb1, rb2) == 2) {
+				//	rb2 减速
+			}
+			else if (will_collision(rb1, rb2) == 3) {
+				//	rb1减速
+			}
+		}
+	}
+}
+
+int Command::will_collision(robot rb1, robot rb2)
+{
+	pair<double, double> rb1_pos = rb1.real_pos;
+	pair<double, double> rb2_pos = rb2.real_pos;
+	double distance1 = GetLength(rb1_pos, rb2_pos);	//	两个机器人之间中心距
+	double distance2 = (abs(rb2_pos.first * tan(rb1.face) - rb2_pos.second +
+		rb1_pos.second - rb1_pos.first * tan(rb1.face))) / sqrt(pow(tan(rb1.face), 2) + 1);
+	double dis_face = abs(rb1.face - rb2.face);
+	if (isNear(rb1.real_pos, idToworker[rb1.cur.start].real_pos, 0.4) && dis_face < 1e-3 && distance2 < 0.6 && distance1 < 1.6) return 2;
+	if (isNear(rb2.real_pos, idToworker[rb2.cur.start].real_pos, 0.4) && dis_face < 1e-3 && distance2 < 0.6 && distance1 < 1.6) return 3;
+	if (dis_face < 1e-3 && distance2 < 0.6 && distance1 < 1.6) return 1;
+	return 0;
 }
 
 void Command::RobotDoWork()
