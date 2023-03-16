@@ -117,10 +117,11 @@ class Command
 	void RobotDoWork();		//我
 	void RobotSelectWork();	//叶
 
-	void mapToreal(pair<int, int>, pair<double, double>&);
-	void realTomap(pair<double, double>, pair<int, int>&);
-	double GetLength(const pair<double, double>&, const pair<double, double>&);
+	void mapToreal(pair<int, int>, pair<double, double>&);						//	坐标转化
+	void realTomap(pair<double, double>, pair<int, int>&);						
+	double GetLength(const pair<double, double>&, const pair<double, double>&);	//	计算两点长度
 	bool isNear(const pair<double, double>&, const pair<double, double>&, double);
+	int will_collision(robot a, robot b);					// 碰撞检测模块	
 
 	void Clean_list();
 	void flush_list();
@@ -131,6 +132,7 @@ class Command
 	void puton_occ_stat(int id);
 	void puton_occ_stat(int id, int object);
 	void puton_need_stat(int id, int object);
+	void collision_avoidance();	//碰撞规避函数
 public:
 	Command() = default;
 	~Command() = default;
