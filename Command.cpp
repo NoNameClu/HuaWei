@@ -1,5 +1,6 @@
 #include "Command.h"
 
+
 #define DEBUG
 
 const unordered_set<int> Command::style{ 1,2,3,4,5,6,7,8,9 };
@@ -7,7 +8,7 @@ const unordered_set<int> Command::style{ 1,2,3,4,5,6,7,8,9 };
 void Command::init()
 {
 	ReadUntilOK();
-	initMap();		//ÕâÒ»²½ÖĞ½«Á½¸öÂ·Ïß¶ÓÁĞ³õÊ¼»¯Íê±Ï¡£
+	initMap();		//è¿™ä¸€æ­¥ä¸­å°†ä¸¤ä¸ªè·¯çº¿é˜Ÿåˆ—åˆå§‹åŒ–å®Œæ¯•ã€‚
 	Add_OK();
 	Response();
 	Clear();
@@ -29,7 +30,7 @@ void Command::start()
 bool Command::ReadUntilOK()
 {
 #ifdef DEBUG
-	cerr << "¿ªÊ¼¶ÁÖ¡" << endl;
+	cerr << "å¼€å§‹è¯»å¸§" << endl;
 #endif // DEBUG
 
 	string line;
@@ -72,30 +73,32 @@ void Command::Response()
 #endif // DEBUG
 
 	}
+	fflush(stdout);
 }
 
 void Command::initMap()
 {
 #ifdef DEBUG
-	cerr << "À´µ½initmapº¯Êı" << endl;
+	cerr << "æ¥åˆ°initmapå‡½æ•°" << endl;
 #endif
 
-	//Ñ­»·µØÍ¼Êı¾İ£¬ÏÈ±£´æÏÂËùÓĞ¹¤×÷Ì¨ºÍ»úÆ÷ÈËµÄ³õÊ¼Î»ÖÃ£¬´Ë´¦Ä¬ÈÏ»º³åÇøbufÄ©Î²Ã»ÓĞok¡£
-	for (int i = buf.size()-1; i >=0; i--) {	//	´Ó×îºóÒ»ĞĞÍùÉÏ½¨Á¢µØÍ¼
-		for (int j = 0; j < 100; ++j) {
-			if (buf[i][j] == 'A') {		// »úÆ÷ÈË
+	//å¾ªç¯åœ°å›¾æ•°æ®ï¼Œå…ˆä¿å­˜ä¸‹æ‰€æœ‰å·¥ä½œå°å’Œæœºå™¨äººçš„åˆå§‹ä½ç½®ï¼Œæ­¤å¤„é»˜è®¤ç¼“å†²åŒºbufæœ«å°¾æ²¡æœ‰okã€‚
+
+	for (int j = 99; j >= 0; --j) {
+		for (int i = 0; i < 100; ++i) {
+			if (buf[j][i] == 'A') {		// æœºå™¨äºº
 				robot temp;
 				temp.state = NONE;
 				robots.push_back(temp);
 			}
-			if (style.find(buf[i][j] - '0') != style.end()) {	// ¹¤×÷Ì¨
+			if (style.find(buf[j][i] - '0') != style.end()) {	// å·¥ä½œå°
 				worker temp;
-				pair<int, int> pos = make_pair(buf.size()-1-i, j);	//	¹¤×÷Ì¨int×ø±ê
+				pair<int, int> pos = make_pair(i, 99 - j);	//	å·¥ä½œå°intåæ ‡
 				pair<double, double> real_pos;
-				mapToreal(pos, real_pos);				//	int×ø±ê×ªdoubleÊµ¼Ê×ø±ê
+				mapToreal(pos, real_pos);				//	intåæ ‡è½¬doubleå®é™…åæ ‡
 				temp.pos = pos;
 				temp.real_pos = real_pos;
-				temp.style = buf[i][j] - '0';
+				temp.style = buf[j][i] - '0';
 				switch (temp.style) {
 				case 1:
 					temp.need_money = 3000;
@@ -151,12 +154,17 @@ void Command::initMap()
 				default:
 					break;
 				}
-				idToworker[i * 100 + j] = temp;
+				idToworker[i * 100 + (99 - j)] = temp;
 			}
 		}
 	}
 
-	//Ñ­»·ÅĞ¶Ï¼ÆËãÂ·¾¶
+#ifdef DEBUG
+	for (const auto& a : idToworker) {
+		cerr << a.second.real_pos.first << " " << a.second.real_pos.second << " " << a.second.style << " " << a.second.pos.first << " " << a.second.pos.second << endl;
+	}
+#endif
+	//å¾ªç¯åˆ¤æ–­è®¡ç®—è·¯å¾„
 	for (auto& p : idToworker) {
 		int start_id = p.first;
 		worker start = p.second;
@@ -166,7 +174,7 @@ void Command::initMap()
 			if (start_id == end_id) {
 				continue;
 			}
-			if ((start.product_object & end.need_object) == 0) {	//	Ç°ÃæÉú²úµÄÊÇºóÃæĞèÒªµÄ£¬´ËÂ·Ïß²ÅÓĞĞ§
+			if ((start.product_object & end.need_object) == 0) {	//	å‰é¢ç”Ÿäº§çš„æ˜¯åé¢éœ€è¦çš„ï¼Œæ­¤è·¯çº¿æ‰æœ‰æ•ˆ
 				continue;
 			}
 			route temp(start_id, end_id);
@@ -175,7 +183,7 @@ void Command::initMap()
 			if (end.style >= 4 && end.style <= 6) {
 				temp.value += (end.sell_money - end.need_money) / 2;
 			}
-			else if(end.style ) {
+			else if(end.style == 7) {
 				temp.value += (end.sell_money - end.need_money) / 3;
 			}
 			temp.object = start.product_object;
@@ -186,7 +194,7 @@ void Command::initMap()
 	}
 
 #ifdef DEBUG
-	cerr << "×Ü¹²ÓĞ" << unavaliable.size() << "Â·¾¶" << endl;
+	cerr << "æ€»å…±æœ‰" << unavaliable.size() << "è·¯å¾„" << endl;
 #endif // DEBUG
 
 
@@ -195,12 +203,12 @@ void Command::initMap()
 void Command::UpdateInfo()
 {
 #ifdef DEBUG
-	cerr << "À´µ½UpdateInfoº¯Êı" << endl;
+	cerr << "æ¥åˆ°UpdateInfoå‡½æ•°" << endl;
 #endif // DEBUG
 
 	string a;
 
-	//	¶ÁµÚÒ»ĞĞ
+	//	è¯»ç¬¬ä¸€è¡Œ
 	int index = 0;
 	a = buf[index++];
 	stringstream sa;
@@ -219,10 +227,10 @@ void Command::UpdateInfo()
 #endif // DEBUG
 
 
-	if (m_temp != money) {
+	/*if (m_temp != money) {
 		stat = WRONG;
 		Clean_list();
-	}
+	}*/
 
 #ifdef DEBUG
 	cerr << (stat == WRONG ? "wrong" : "normal") << endl;
@@ -232,7 +240,7 @@ void Command::UpdateInfo()
 	money = m_temp;
 	flush_money_stat();
 
-	//	¶ÁµÚ¶şĞĞ
+	//	è¯»ç¬¬äºŒè¡Œ
 	a = buf[index++];
 
 #ifdef DEBUG
@@ -243,7 +251,7 @@ void Command::UpdateInfo()
 	sb >> worker_num;
 
 #ifdef DEBUG
-	cerr << "¸üĞÂ¹¤×÷Ì¨Ç°" << endl;
+	cerr << "æ›´æ–°å·¥ä½œå°å‰" << endl;
 	//cerr << buf.size() << endl;
 	//cerr << worker_num << endl;
 #endif // DEBUG
@@ -257,7 +265,7 @@ void Command::UpdateInfo()
 
 
 	while (n--) {
-		//	¶ÁµÚ3µ½n+3ĞĞ
+		//	è¯»ç¬¬3åˆ°n+3è¡Œ
 		a = buf[index++];
 		stringstream s_for;
 		s_for.str(a);
@@ -267,11 +275,11 @@ void Command::UpdateInfo()
 		pair<double, double> real_pos;
 		s_for >> real_pos.first;
 		s_for >> real_pos.second;
-		tmp.real_pos = real_pos;	//	×ø±ê×ª»¯
+		tmp.real_pos = real_pos;	//	åæ ‡è½¬åŒ–
 		realTomap(tmp.real_pos, tmp.pos); 
 
 		int time;
-		s_for >> time;		// ¹¤×÷Ì¨Ê£ÓàµÄÉú²úÊ±¼ä£¨Ã»ÓĞÓÃµ½£©
+		s_for >> time;		// å·¥ä½œå°å‰©ä½™çš„ç”Ÿäº§æ—¶é—´ï¼ˆæ²¡æœ‰ç”¨åˆ°ï¼‰
 		tmp.time = time;
 		s_for >> tmp.hold_object;
 		s_for >> tmp.output;
@@ -282,11 +290,11 @@ void Command::UpdateInfo()
 
 
 		int id = tmp.pos.first * 100 + tmp.pos.second;
-		// tmp2¼ÇÂ¼ÁË´Ë¹¤×÷Ì¨ÉÏÒ»Ö¡µÄ×´Ì¬£¬µ«»¹Ã»ÓĞÓëµ±Ç°Ö¡±È½ÏÅĞ´í
+		// tmp2è®°å½•äº†æ­¤å·¥ä½œå°ä¸Šä¸€å¸§çš„çŠ¶æ€ï¼Œä½†è¿˜æ²¡æœ‰ä¸å½“å‰å¸§æ¯”è¾ƒåˆ¤é”™
 		if (tmp.output) {
 
 #ifdef DEBUG
-			//cerr << "ÍÑµôproductµÄÊø¸¿" << endl;
+			//cerr << "è„±æ‰productçš„æŸç¼š" << endl;
 #endif // DEBUG
 
 
@@ -298,7 +306,7 @@ void Command::UpdateInfo()
 	bool flag = true;
 
 #ifdef DEBUG
-	cerr << "¸üĞÂ»úÆ÷ÈËÖ®Ç°" << endl;
+	cerr << "æ›´æ–°æœºå™¨äººä¹‹å‰" << endl;
 #endif // DEBUG
 
 
@@ -312,7 +320,7 @@ void Command::UpdateInfo()
 		int item;
 		s_for >> item;
 
-		double time_weight, collide_weight;		// Ê±¼ä¼ÛÖµÏµÊıºÍÅö×²¼ÛÖµÏµÊı£¬Ã»ÓĞÓÃÉÏ
+		double time_weight, collide_weight;		// æ—¶é—´ä»·å€¼ç³»æ•°å’Œç¢°æ’ä»·å€¼ç³»æ•°ï¼Œæ²¡æœ‰ç”¨ä¸Š
 		s_for >> time_weight;
 		s_for >> collide_weight;
 
@@ -322,8 +330,8 @@ void Command::UpdateInfo()
 		s_for >> face;
 		s_for >> real_pos.first >> real_pos.second;
 		
-		//robots[i].on_job = item > 0;	// Ğ¯´øÎïÆ·±àºÅ´óÓÚ0¾Í±íÊ¾ÔÚ¹¤×÷ÖĞ
-		robots[i].face = face;			// ¸üĞÂ»úÆ÷ÈËĞÅÏ¢
+		//robots[i].on_job = item > 0;	// æºå¸¦ç‰©å“ç¼–å·å¤§äº0å°±è¡¨ç¤ºåœ¨å·¥ä½œä¸­
+		robots[i].face = face;			// æ›´æ–°æœºå™¨äººä¿¡æ¯
 		robots[i].a_speed = a_speed;
 		robots[i].l_speed = l_speed;
 		robots[i].real_pos = real_pos;
@@ -335,6 +343,7 @@ void Command::UpdateInfo()
 				robots[i].can_sell = true;
 			}
 		}
+
 		if (robots[i].l_speed.first != 0 || robots[i].l_speed.second != 0 || robots[i].a_speed != 0) {
 			flag = false;
 		}
@@ -349,7 +358,7 @@ void Command::UpdateInfo()
 }
 
 
-//	Åö×²¹æ±ÜÄ£¿é
+//	ç¢°æ’è§„é¿æ¨¡å—
 void Command::collision_avoidance()
 {
 	for (int i = 0; i < robots.size()-1; i++) {
@@ -357,14 +366,14 @@ void Command::collision_avoidance()
 		for (int j = i+1; j < robots.size(); j++) {
 			robot rb2 = robots[j];
 			if (will_collision(rb1, rb2) == 1) {
-				//	Ğı×ª½Ç£¬½«rb1,rb2 Ğı×ª+30¶È
+				//	æ—‹è½¬è§’ï¼Œå°†rb1,rb2 æ—‹è½¬+30åº¦
 
 			}
 			else if (will_collision(rb1, rb2) == 2) {
-				//	rb2 ¼õËÙ
+				//	rb2 å‡é€Ÿ
 			}
 			else if (will_collision(rb1, rb2) == 3) {
-				//	rb1¼õËÙ
+				//	rb1å‡é€Ÿ
 			}
 		}
 	}
@@ -374,7 +383,7 @@ int Command::will_collision(robot rb1, robot rb2)
 {
 	pair<double, double> rb1_pos = rb1.real_pos;
 	pair<double, double> rb2_pos = rb2.real_pos;
-	double distance1 = GetLength(rb1_pos, rb2_pos);	//	Á½¸ö»úÆ÷ÈËÖ®¼äÖĞĞÄ¾à
+	double distance1 = GetLength(rb1_pos, rb2_pos);	//	ä¸¤ä¸ªæœºå™¨äººä¹‹é—´ä¸­å¿ƒè·
 	double distance2 = (abs(rb2_pos.first * tan(rb1.face) - rb2_pos.second +
 		rb1_pos.second - rb1_pos.first * tan(rb1.face))) / sqrt(pow(tan(rb1.face), 2) + 1);
 	double dis_face = abs(rb1.face - rb2.face);
@@ -387,48 +396,49 @@ int Command::will_collision(robot rb1, robot rb2)
 void Command::RobotDoWork()
 {
 #ifdef DEBUG
-	cerr << "À´µ½doworkº¯Êı" << endl;
+	cerr << "æ¥åˆ°doworkå‡½æ•°" << endl;
 #endif // DEBUG
 
-	if (stat == WRONG) {	//	×´Ì¬´íÎóÊ±£¬Çå¿Õ»úÆ÷ÈËÎïÆ·
-		for (int i = 0; i < robots.size(); ++i) {
-			string first = "", second = "", third = "";
-			first += "forward ";
-			first += to_string(i);
-			first += " ";
-			first += to_string(0);
-			second += "rotate ";
-			second += to_string(i);
-			second += " ";
-			second += to_string(0);
-			third += "destroy ";
-			third += to_string(i);
-			response.push_back(first);
-			response.push_back(second);
-			response.push_back(third);
-			robots[i].can_buy = false;
-			robots[i].can_sell = false;
-		}
-		return;
-	}
+	//if (stat == WRONG) {	//	çŠ¶æ€é”™è¯¯æ—¶ï¼Œæ¸…ç©ºæœºå™¨äººç‰©å“
+	//	for (int i = 0; i < robots.size(); ++i) {
+	//		string first = "", second = "", third = "";
+	//		first += "forward ";
+	//		first += to_string(i);
+	//		first += " ";
+	//		first += to_string(0);
+	//		second += "rotate ";
+	//		second += to_string(i);
+	//		second += " ";
+	//		second += to_string(0);
+	//		third += "destroy ";
+	//		third += to_string(i);
+	//		response.push_back(first);
+	//		response.push_back(second);
+	//		response.push_back(third);
+	//		robots[i].can_buy = false;
+	//		robots[i].can_sell = false;
+	//	}
+	//	return;
+	//}
 
-	//Ñ­»·ÅĞ¶ÏÄÄĞ©robotÒÑ¾­±»Ñ¡ÔñÁËÂ·Ïß
+
+	//å¾ªç¯åˆ¤æ–­å“ªäº›robotå·²ç»è¢«é€‰æ‹©äº†è·¯çº¿
 	for (int i = 0; i < robots.size(); ++i) {
 		worker next;
 		string fd, ro;
 		robot rt = robots[i];
 #ifdef DEBUG
-		//cerr << "»úÆ÷ÈË" << i << endl;
+		//cerr << "æœºå™¨äºº" << i << endl;
 #endif // DEBUG
 
 		if (!rt.on_job) {
 			continue;
 		}
 #ifdef DEBUG
-		//cerr << "»úÆ÷ÈË" << i << "¿ªÊ¼¹¤×÷" << endl;
+		//cerr << "æœºå™¨äºº" << i << "å¼€å§‹å·¥ä½œ" << endl;
 #endif // DEBUG
 
-		if (rt.can_buy && rt.state == BEFORE) {	//	ÄÜ¹ºÂò£¨¿¿½üÄ¿±ê¹¤×÷Ì¨£©
+		if (rt.can_buy && rt.state == BEFORE) {	//	èƒ½è´­ä¹°ï¼ˆé è¿‘ç›®æ ‡å·¥ä½œå°ï¼‰
 			string temp = "";
 			temp += "buy ";
 			temp += to_string(i);
@@ -436,12 +446,11 @@ void Command::RobotDoWork()
 
 			robots[i].state = AFTER;
 			robots[i].can_buy = false;
-			money -= robots[i].cur.base;
 
 			puton_product_stat(rt.cur.start);
 		}
 
-		if (rt.can_sell && rt.state == AFTER) {	//	ÄÜ³öÊÛ
+		if (rt.can_sell && rt.state == AFTER) {	//	èƒ½å‡ºå”®
 			string temp = "";
 			temp += "sell ";
 			temp += to_string(i);
@@ -450,7 +459,6 @@ void Command::RobotDoWork()
 			robots[i].state = NONE;
 			robots[i].can_sell = false;
 			robots[i].on_job = false;
-			money += robots[i].cur.value + robots[i].cur.base;
 			
 			puton_need_stat(rt.cur.end, rt.cur.object);
 		}
@@ -463,30 +471,20 @@ void Command::RobotDoWork()
 			next = idToworker[rt.cur.end];
 			break;
 		case NONE:
-			fd += "forward ";
-			fd += to_string(i);
-			fd += " ";
-			fd += to_string(0);
-			ro += "rotate ";
-			ro += to_string(i);
-			ro += " ";
-			ro += to_string(0);
-			response.push_back(fd);
-			response.push_back(ro);
 			return;
 		}
 
 #ifdef DEBUG
-		//cerr << "»úÆ÷ÈË" << i << "¿ªÊ¼¹¤×÷" << endl;
+		//cerr << "æœºå™¨äºº" << i << "å¼€å§‹å·¥ä½œ" << endl;
 #endif // DEBUG
 
 
-		//ÕÒµ½ÁËÄ¿±ê
+		//æ‰¾åˆ°äº†ç›®æ ‡
 		double speed, angle;
 		double x = next.real_pos.second - rt.real_pos.second,
 			y = (next.real_pos.first - rt.real_pos.first);
-		double target_angle = atan2(x, y);	//	¼ÆËãÄ¿±ê½Ç¶ÈÓëxÕı°ëÖá¼Ğ½Ç
-		double a_diff = target_angle + (-rt.face);	//	¼ÆËãÄ¿±ê½Ç¶ÈÓë³¯ÏòµÄ²îÖµ
+		double target_angle = atan2(x, y);	//	è®¡ç®—ç›®æ ‡è§’åº¦ä¸xæ­£åŠè½´å¤¹è§’
+		double a_diff = target_angle + (-rt.face);	//	è®¡ç®—ç›®æ ‡è§’åº¦ä¸æœå‘çš„å·®å€¼
 		if (a_diff > M_PI) {
 			a_diff -= 2 * M_PI;
 		}
@@ -497,32 +495,32 @@ void Command::RobotDoWork()
 		a_diff = abs(a_diff);
 
 #ifdef DEBUG
-		cerr << GetLength(rt.real_pos, next.real_pos) << "»úÆ÷ÈË" << i << endl;
-		cerr << "Ä¿µÄµØÊÇ" << next.real_pos.first << " " << next.real_pos.second << "»úÆ÷ÈËÔÚ" << rt.real_pos.first << " " << rt.real_pos.second << endl;
-		cerr << "Æ«½ÇÊÇ" << a_diff * (180 / M_PI) << endl;;
+		cerr << GetLength(rt.real_pos, next.real_pos) << "æœºå™¨äºº" << i << endl;
+		cerr << "ç›®çš„åœ°æ˜¯" << next.real_pos.first << " " << next.real_pos.second << "æœºå™¨äººåœ¨" << rt.real_pos.first << " " << rt.real_pos.second << endl;
+		cerr << "åè§’æ˜¯" << a_diff * (180 / M_PI) << endl;;
 #endif // DEBUG
 
 
-		//µ±»úÆ÷ÈËºÍÄ¿±êµØµãÆ«½ÇºÜ´ó
+		//å½“æœºå™¨äººå’Œç›®æ ‡åœ°ç‚¹åè§’å¾ˆå¤§
 		if (a_diff >= M_PI_2) {
-			speed = 0.1;
+			speed = 1;
 			angle = M_PI * dir;
 		}
-		//µ±»úÆ÷ÈËºÍÄ¿±êµØµãÆ«½Ç½Ï´ó
+		//å½“æœºå™¨äººå’Œç›®æ ‡åœ°ç‚¹åè§’è¾ƒå¤§
 		else if(a_diff >= M_PI_8) {
 			speed = 2;
-			angle = M_PI_2 * dir;
+			angle = M_PI * dir;
 		}
-		//×öÎ¢µ÷  
+		//åšå¾®è°ƒ  
 		else if(a_diff >= M_PI_32) {
 			speed = 3;
-			angle = M_PI_8 * dir;
+			angle = M_PI_4 * dir;
 		}
 		else if (a_diff >= M_PI_64) {
-			speed = 5;
-			angle = M_PI_16 * dir;
+			speed = 6;
+			angle = M_PI_8 * dir;
 		}
-		//Ç°½ø
+		//å‰è¿›
 		else {
 			speed = 6;
 			angle = 0;
@@ -547,9 +545,13 @@ flush_list();
 void Command::RobotSelectWork()
 {
 #ifdef DEBUG
-	cerr << "À´µ½selectº¯Êı" << endl;
-	cerr << "ÓĞ" << avaliable.size() << "ÌõÂ·¾¶" << endl;
+	cerr << "æ¥åˆ°selectå‡½æ•°" << endl;
+	cerr << "æœ‰" << avaliable.size() << "æ¡è·¯å¾„" << endl;
 #endif // DEBUG
+
+	if (frame >= 8500) {
+		return;
+	}
 
 	if (stat == WRONG) {
 		for (int i = 0; i < robots.size(); ++i) {
@@ -559,41 +561,86 @@ void Command::RobotSelectWork()
 	}
 
 	for (int i = 0; i < robots.size(); i++) {
-		//ÅĞ¶Ïµ±Ç°»úÆ÷ÈËÊÇ·ñÓĞ¹¤×÷
-		//ÄÃµ½µ±Ç°»úÆ÷ÈËµÄ×ø±ê£¬
-		//±éÀú¿ÉÑ¡µÄÂ·Ïß£¬Í³¼Æ¿ÉÑ¡Â·Ïß¸÷¸öµÄ³¤¶È
-		//first£º×Ü³¤¶È£¬second£ºÂ·Ïß
+		//åˆ¤æ–­å½“å‰æœºå™¨äººæ˜¯å¦æœ‰å·¥ä½œ
+		//æ‹¿åˆ°å½“å‰æœºå™¨äººçš„åæ ‡ï¼Œ
+		//éå†å¯é€‰çš„è·¯çº¿ï¼Œç»Ÿè®¡å¯é€‰è·¯çº¿å„ä¸ªçš„é•¿åº¦
+		//firstï¼šæ€»é•¿åº¦ï¼Œsecondï¼šè·¯çº¿
 		robot rb = robots[i];
-		if (rb.on_job) continue;	// µ±Ç°»úÆ÷ÈËÃ»ÓĞ·ÖÅä¹¤×÷
+		if (rb.on_job) continue;	// å½“å‰æœºå™¨äººæ²¡æœ‰åˆ†é…å·¥ä½œ
 
 
-		//	Ñ°ÕÒmaxValueºÍmaxDistance£¬·½±ã¹éÒ»»¯ÒÔ¼°ÕıÏò»¯
+		//	å¯»æ‰¾maxValueå’ŒmaxDistanceï¼Œæ–¹ä¾¿å½’ä¸€åŒ–ä»¥åŠæ­£å‘åŒ–
 		double maxValue = 0, maxDistance = 0;
 		for (auto& cur_route : avaliable) {
 			worker route_start_worker = idToworker[cur_route.start];
 			pair<double, double> cur_worker_pos = route_start_worker.real_pos;
-			double distance = GetLength(rb.real_pos, cur_worker_pos);	//	¼ÆËã»úÆ÷ÈËµ½ÆğÊ¼µã¾àÀë
+			double distance = GetLength(rb.real_pos, cur_worker_pos);	//	è®¡ç®—æœºå™¨äººåˆ°èµ·å§‹ç‚¹è·ç¦»
+			distance += cur_route.length;
+			maxValue = max(maxValue, cur_route.value);
+			maxDistance = max(maxDistance, distance);
+
+		}
+#ifdef DEBUG
+		cerr << "before maybe first" << endl;
+#endif // DEBUG
+
+		for (auto& cur_route : maybe_avaliable) {
+			if (idToworker[cur_route.start].time <= 0) {
+				continue;
+			}
+			worker route_start_worker = idToworker[cur_route.start];
+			pair<double, double> cur_worker_pos = route_start_worker.real_pos;
+			double distance = GetLength(rb.real_pos, cur_worker_pos); //	è®¡ç®—æœºå™¨äººåˆ°èµ·å§‹ç‚¹è·ç¦»
+			if ((lengthOneFrame * route_start_worker.time) > distance) {
+				continue;
+			}
 			distance += cur_route.length;
 			maxValue = max(maxValue, cur_route.value);
 			maxDistance = max(maxDistance, distance);
 		}
-		//	½«¹éÒ»»¯ºÍÕıÏò»¯Ö®ºóµÄÖ¸±ê¼ÓÈ¨¸³·Ö¸øÂ·Ïß£¬È»ºó·Å½øpriority_queue
+		//	å°†å½’ä¸€åŒ–å’Œæ­£å‘åŒ–ä¹‹åçš„æŒ‡æ ‡åŠ æƒèµ‹åˆ†ç»™è·¯çº¿ï¼Œç„¶åæ”¾è¿›priority_queue
 
 		auto cmp = [](const pair<double, route>& lhs, const pair<double, route>& rhs) {
-			return lhs.first < rhs.first;
+			return lhs.first > rhs.first;
 		};
-
-		priority_queue<pair<double, route>, vector<pair<double, route>>, decltype(cmp)> pq(cmp);	//	£¡Õâ±ßÒÔdoubleÉıĞò
+		priority_queue<pair<double, route>, vector<pair<double, route>>, decltype(cmp)> pq(cmp);	//	ï¼è¿™è¾¹ä»¥doubleå‡åº
 		for (auto cur_route : avaliable) {
 			worker route_start_worker = idToworker[cur_route.start];
 			pair<double, double> cur_worker_pos = route_start_worker.real_pos;
-			double distance = GetLength(rb.real_pos, cur_worker_pos);	//	¼ÆËã»úÆ÷ÈËµ½ÆğÊ¼µã¾àÀë
+			double distance = GetLength(rb.real_pos, cur_worker_pos);	//	è®¡ç®—æœºå™¨äººåˆ°èµ·å§‹ç‚¹è·ç¦»
 			distance += cur_route.length;
-			distance = distance / maxDistance;	//Â·ÏßÔ½Ğ¡Ô½ºÃ£¬ÕâÊÇÒ»¸ö¼«Ğ¡ĞÍÖ¸±ê
-			maxValue = 1 - cur_route.value / maxValue;	// ¼ÛÖµÔ½´óÔ½ºÃ£¬ÕâÒ»¸ö¼«´óĞÍÖ¸±ê£¬ĞèÒªÕıÏò»¯
-			double score = distance * 0.5 + maxValue * 0.5;	//	È¨ÖØ¶¼ÖÃ0.5
-			pq.push(make_pair(score, cur_route));	//Ñ¡ÖĞµÄÂ·Ïß¸øËüÆÀ·Ö£¬Ô½Ğ¡Ô½ºÃ£¬½ø¶Ñ	
+			distance = distance / maxDistance;	//è·¯çº¿è¶Šå°è¶Šå¥½ï¼Œè¿™æ˜¯ä¸€ä¸ªæå°å‹æŒ‡æ ‡
+			double temp_value;
+			temp_value = 1 - cur_route.value / maxValue;	// ä»·å€¼è¶Šå¤§è¶Šå¥½ï¼Œè¿™ä¸€ä¸ªæå¤§å‹æŒ‡æ ‡ï¼Œéœ€è¦æ­£å‘åŒ–
+			double score = temp_value * VALUE_WEIGHT + distance * LENGTH_WEIGHT;	//	æƒé‡éƒ½ç½®0.5
+			pq.push(make_pair(score, cur_route));	//é€‰ä¸­çš„è·¯çº¿ç»™å®ƒè¯„åˆ†ï¼Œè¶Šå°è¶Šå¥½ï¼Œè¿›å †	
 		}
+
+#ifdef DEBUG
+		cerr << "before maybe second" << endl;
+#endif // DEBUG
+		for (auto cur_route : maybe_avaliable) {
+			if (idToworker[cur_route.start].time <= 0) {
+				continue;
+			}
+			worker route_start_worker = idToworker[cur_route.start];
+			pair<double, double> cur_worker_pos = route_start_worker.real_pos;
+			double distance = GetLength(rb.real_pos, cur_worker_pos);	//	è®¡ç®—æœºå™¨äººåˆ°èµ·å§‹ç‚¹è·ç¦»
+			if ((lengthOneFrame * route_start_worker.time) > distance) {
+				continue;
+			}
+			distance += cur_route.length;
+			distance = distance / maxDistance;	//è·¯çº¿è¶Šå°è¶Šå¥½ï¼Œè¿™æ˜¯ä¸€ä¸ªæå°å‹æŒ‡æ ‡
+			double temp_value;
+			temp_value = 1 - cur_route.value / maxValue;	// ä»·å€¼è¶Šå¤§è¶Šå¥½ï¼Œè¿™ä¸€ä¸ªæå¤§å‹æŒ‡æ ‡ï¼Œéœ€è¦æ­£å‘åŒ–
+			double score = temp_value * VALUE_WEIGHT + distance * LENGTH_WEIGHT;	//	æƒé‡éƒ½ç½®0.5
+			pq.push(make_pair(score, cur_route));	//é€‰ä¸­çš„è·¯çº¿ç»™å®ƒè¯„åˆ†ï¼Œè¶Šå°è¶Šå¥½ï¼Œè¿›å †	
+		}
+
+#ifdef DEBUG
+		cerr << "after maybe second" << endl;
+#endif // DEBUG
+
 
 		if (pq.empty()) {
 			return;
@@ -602,9 +649,9 @@ void Command::RobotSelectWork()
 		pair<double, route> my_route = pq.top();
 		pq.pop();
 
-		//ÄãÈ¡³öÀ´ÁËÕâ¸öÂ·Ïß
+		//ä½ å–å‡ºæ¥äº†è¿™ä¸ªè·¯çº¿
 		//start,end
-		//Ë¢ĞÂÂ·Ïß
+		//åˆ·æ–°è·¯çº¿
 		puton_occ_stat(my_route.second.start);
 		puton_occ_stat(my_route.second.end, my_route.second.object);
 		flush_list();
@@ -613,7 +660,7 @@ void Command::RobotSelectWork()
 		robots[i].state = BEFORE;
 
 #ifdef DEBUG
-		cerr << "robot¿ªÊ¼¹¤×÷" << endl;
+		cerr << "robotå¼€å§‹å·¥ä½œ" << endl;
 #endif // DEBUG
 
 
@@ -623,7 +670,8 @@ void Command::RobotSelectWork()
 void Command::mapToreal(pair<int, int> old, pair<double, double>& ret)
 {
 	ret.first = static_cast<double>(old.first) / 2 + 0.25;
-	ret.second = 50 - (static_cast<double>(old.second) / 2 + 0.25);
+	ret.second = (static_cast<double>(old.second) / 2 + 0.25);
+
 }
 
 void Command::realTomap(pair<double, double> old, pair<int, int>& ret)
@@ -632,7 +680,7 @@ void Command::realTomap(pair<double, double> old, pair<int, int>& ret)
 	ret.second = 99 - (old.second - 0.25) * 2;
 }
 
-//	ËãÁ½¸öµãÖ®¼äµÄ¾àÀë
+//	ç®—ä¸¤ä¸ªç‚¹ä¹‹é—´çš„è·ç¦»
 double Command::GetLength(const pair<double, double>& lhs, const pair<double, double>& rhs) {
 	double x = lhs.first - rhs.first, y = lhs.second - rhs.second;
 	return sqrt(x * x + y * y);
@@ -646,12 +694,18 @@ bool Command::isNear(const pair<double, double>& lhs, const pair<double, double>
 	return false;
 }
 
-//	Çå³ıavaliable£¬ÖØÖÃunavaliable
+//	æ¸…é™¤avaliableï¼Œé‡ç½®unavaliable
 void Command::Clean_list() {
 	for (auto p = avaliable.begin(); p != avaliable.end();) {
 		unavaliable.insert(unavaliable.end(), *p);
 		p = avaliable.erase(p);
 	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		unavaliable.insert(unavaliable.end(), *p);
+		p = maybe_avaliable.erase(p);
+	}
+
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		p->stat = NO_PRODUCT;
 		if ((idToworker[p->end].hold_object & p->object) != 0){
@@ -660,10 +714,14 @@ void Command::Clean_list() {
 	}
 }
 
-//	¸üĞÂ±»Ñ¡ÖĞµÄÂ·Ïß
+//	æ›´æ–°è¢«é€‰ä¸­çš„è·¯çº¿
 void Command::flush_list() {
 	for (auto p = avaliable.begin(); p != avaliable.end();) {
-		if (p->stat != 0) {
+		if ((p->stat ^ NO_PRODUCT) == 0) {
+			maybe_avaliable.insert(maybe_avaliable.end(), *p);
+			p = avaliable.erase(p);
+		}
+		else if (p->stat != 0) {
 			unavaliable.insert(unavaliable.end(), *p);
 			p = avaliable.erase(p);
 		}
@@ -672,13 +730,31 @@ void Command::flush_list() {
 		}
 	}
 
-	for (auto p = unavaliable.begin(); p != unavaliable.end();) {
-		if (p->stat == 0) {
-			avaliable.insert(avaliable.end(), *p);
-			p = unavaliable.erase(p);
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end();) {
+		if ((p->stat ^ NO_PRODUCT) == 0) {
+			++p;
+		}
+		else if (p->stat != 0) {
+			unavaliable.insert(unavaliable.end(), *p);
+			p = maybe_avaliable.erase(p);
 		}
 		else {
+			avaliable.insert(avaliable.end(), *p);
+			p = maybe_avaliable.erase(p);
+		}
+	}
+
+	for (auto p = unavaliable.begin(); p != unavaliable.end();) {
+		if ((p->stat ^ NO_PRODUCT) == 0) {
+			maybe_avaliable.insert(maybe_avaliable.end(), *p);
+			p = unavaliable.erase(p);
+		}
+		else if (p->stat != 0) {
 			++p;
+		}
+		else {
+			avaliable.insert(avaliable.end(), *p);
+			p = unavaliable.erase(p);
 		}
 #ifdef DEBUG
 		//cerr << p->stat << endl;
@@ -686,10 +762,10 @@ void Command::flush_list() {
 	}
 
 #ifdef DEBUG
-	cerr << "Â·Ïß" << avaliable.size() << " " << unavaliable.size() << endl;
+	cerr << "è·¯çº¿" << avaliable.size() << " " << unavaliable.size() << endl;
 	/*if (avaliable.size() == 0) {
 		for (const auto& p : unavaliable) {
-			cerr << "Ô­Òò" << p.stat << endl;
+			cerr << "åŸå› " << p.stat << endl;
 		}
 	}*/
 #endif // DEBUG
@@ -705,6 +781,13 @@ void Command::flush_money_stat() {
 			p->stat |= NO_MONEY;
 		}
 	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		if (p->base > money) {
+			p->stat |= NO_MONEY;
+		}
+	}
+
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
 		if (p->base > money) {
 			p->stat |= NO_MONEY;
@@ -718,50 +801,68 @@ void Command::takeoff_product_stat(int id) {
 			p->stat &= (~NO_PRODUCT);
 		}
 	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		if (p->start == id) {
+			p->stat &= (~NO_PRODUCT);
+		}
+	}
 }
 
 void Command::puton_product_stat(int id) {
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
 		if (p->start == id) {
-			p->stat &= (~OCC);
+			p->stat &= (~OCC_S);
 			p->stat |= NO_PRODUCT;
 		}
 	}
 
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		if (p->start == id) {
-			p->stat &= (~OCC);
+			p->stat &= (~OCC_S);
 			p->stat |= NO_PRODUCT;
 		}
 	}
 }
 
-//start°æ±¾
+//startç‰ˆæœ¬
 void Command::puton_occ_stat(int id) {
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
 		if (p->start == id) {
-			p->stat |= OCC;
+			p->stat |= OCC_S;
+		}
+	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		if (p->start == id) {
+			p->stat |= OCC_S;
 		}
 	}
 
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		if (p->start == id) {
-			p->stat |= OCC;
+			p->stat |= OCC_S;
 		}
 	}
 }
 
-//end°æ±¾
+//endç‰ˆæœ¬
 void Command::puton_occ_stat(int id, int object) {
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
 		if (p->end == id && p->object == object) {
-			p->stat |= OCC;
+			p->stat |= OCC_E;
+		}
+	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		if (p->end == id && p->object == object) {
+			p->stat |= OCC_E;
 		}
 	}
 
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		if (p->end == id && p->object == object) {
-			p->stat |= OCC;
+			p->stat |= OCC_E;
 		}
 	}
 }
@@ -769,14 +870,21 @@ void Command::puton_occ_stat(int id, int object) {
 void Command::puton_need_stat(int id, int object) {
 	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
 		if (p->end == id && p->object == object) {
-			p->stat &= (~OCC);
+			p->stat &= (~OCC_E);
+			p->stat |= NO_NEED;
+		}
+	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		if (p->end == id && p->object == object) {
+			p->stat &= (~OCC_E);
 			p->stat |= NO_NEED;
 		}
 	}
 
 	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
 		if (p->end == id && p->object == object) {
-			p->stat &= (~OCC);
+			p->stat &= (~OCC_E);
 			p->stat |= NO_NEED;
 		}
 	}

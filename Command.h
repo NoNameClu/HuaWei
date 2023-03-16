@@ -1,4 +1,5 @@
-#pragma once
+#ifndef COMMAND
+#define COMMAND
 #include <iostream>
 #include <algorithm>
 #include <unordered_map>
@@ -6,8 +7,9 @@
 #include <queue>
 #include <list>
 #include <vector>
-#include <string>
+#include <string.h>
 #include "math.h"
+#include <cmath>
 #include<sstream>
 
 
@@ -26,7 +28,13 @@ const int OK = 0;
 const int NO_MONEY = 1;
 const int NO_PRODUCT = 1 << 1;
 const int NO_NEED = 1 << 2;
-const int OCC = 1 << 3;
+const int OCC_S = 1 << 3;
+const int OCC_E = 1 << 4;
+
+const double lengthOneFrame = 0.13;
+
+const double VALUE_WEIGHT = 0.2;
+const double LENGTH_WEIGHT = 0.8;
 
 enum robot_state {
 	//添加none状态，表示现在没有分配工作
@@ -51,6 +59,7 @@ struct worker {
 };
 
 struct route {
+	int robot;						//标记当前是哪个
 	int start, end;
 	int base;						//所需的最小钱数
 	double value;					//这里一开始就要做归一化操作
@@ -90,7 +99,7 @@ class Command
 	int worker_num;
 	int frame;		//帧
 	Command_stat stat;
-	list<route> avaliable, unavaliable;		//可用路线，不可用路线
+	list<route> avaliable, unavaliable, maybe_avaliable;		//可用路线，不可用路线, 可能可用的路线（只有因为产品没生产导致不可用的队列）
 	vector<robot> robots;					//机器人数组
 	vector<string> buf, response;			//读入缓冲区，输出缓冲区
 	unordered_map<int, worker> idToworker;	//id，到worker的索引，12,13,1213。 45.75 49.25   (x - 0.25) / 0.5
@@ -133,3 +142,4 @@ public:
 	void start();
 };
 
+#endif // COMMAND
