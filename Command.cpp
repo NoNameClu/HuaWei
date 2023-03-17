@@ -391,11 +391,11 @@ int Command::will_collision(robot rb1, robot rb2)
 		rb2.real_pos.second - rb1.real_pos.second);	// 从rb1到rb2的目标向量
 
 	double theta = atan2(rb1_to_rb2.second,rb1_to_rb2.first);	// 算目标向量的辐角
-	double dis_face = abs(rb1.face - rb2.face);
+	double dis_face = abs(rb1.face - rb2.face);			// 两个机器人之间朝向小于6度，修改下面的参数
 
 	double derta_theta = abs(theta - rb1.face);		//	算目标辐角和朝向差值的绝对值
-	if (isNear(rb1.real_pos, idToworker[rb1.cur.start].real_pos, 0.4) && dis_face < 1e-3 && distance2 < 1.1 && distance1 < 1.6) return 2;
-	if (isNear(rb2.real_pos, idToworker[rb2.cur.start].real_pos, 0.4) && dis_face < 1e-3 && distance2 < 1.1 && distance1 < 1.6) return 3;
+	if (isNear(rb1.real_pos, idToworker[rb1.cur.start].real_pos, 0.4) && dis_face < 1e-1 && distance2 < 1.1 && distance1 < 1.6) return 2;
+	if (isNear(rb2.real_pos, idToworker[rb2.cur.start].real_pos, 0.4) && dis_face < 1e-1 && distance2 < 1.1 && distance1 < 1.6) return 3;
 
 	if (derta_theta < M_PI_8 && distance1 < 1.6) return 1;
 	if (dis_face < 1e-3 && distance2 < 0.6 && distance1 < 1.6) return 1;
