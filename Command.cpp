@@ -370,10 +370,10 @@ void Command::collision_avoidance()
 
 			}
 			else if (will_collision(rb1, rb2) == 2) {
-				//	rb2 减速
+				//	rb2 减速到0
 			}
 			else if (will_collision(rb1, rb2) == 3) {
-				//	rb1减速
+				//	rb1	减速到0
 			}
 		}
 	}
@@ -385,10 +385,19 @@ int Command::will_collision(robot rb1, robot rb2)
 	pair<double, double> rb2_pos = rb2.real_pos;
 	double distance1 = GetLength(rb1_pos, rb2_pos);	//	两个机器人之间中心距
 	double distance2 = (abs(rb2_pos.first * tan(rb1.face) - rb2_pos.second +
-		rb1_pos.second - rb1_pos.first * tan(rb1.face))) / sqrt(pow(tan(rb1.face), 2) + 1);
+		rb1_pos.second - rb1_pos.first * tan(rb1.face))) / sqrt(pow(tan(rb1.face), 2) + 1);	//	两个机器人到位移路径的距离
+	
+	pair<double, double> rb1_to_rb2 = make_pair(rb2.real_pos.first - rb1.real_pos.first,
+		rb2.real_pos.second - rb1.real_pos.second);	// 从rb1到rb2的目标向量
+
+	double theta = atan2(rb1_to_rb2.second,rb1_to_rb2.first);	// 算目标向量的辐角
 	double dis_face = abs(rb1.face - rb2.face);
-	if (isNear(rb1.real_pos, idToworker[rb1.cur.start].real_pos, 0.4) && dis_face < 1e-3 && distance2 < 0.6 && distance1 < 1.6) return 2;
-	if (isNear(rb2.real_pos, idToworker[rb2.cur.start].real_pos, 0.4) && dis_face < 1e-3 && distance2 < 0.6 && distance1 < 1.6) return 3;
+
+	double derta_theta = abs(theta - rb1.face);		//	算目标辐角和朝向差值的绝对值
+	if (isNear(rb1.real_pos, idToworker[rb1.cur.start].real_pos, 0.4) && dis_face < 1e-3 && distance2 < 1.1 && distance1 < 1.6) return 2;
+	if (isNear(rb2.real_pos, idToworker[rb2.cur.start].real_pos, 0.4) && dis_face < 1e-3 && distance2 < 1.1 && distance1 < 1.6) return 3;
+
+	if (derta_theta < M_PI_8 && distance1 < 1.6) return 1;
 	if (dis_face < 1e-3 && distance2 < 0.6 && distance1 < 1.6) return 1;
 	return 0;
 }
