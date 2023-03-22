@@ -12,6 +12,7 @@
 #include <sstream>
 
 #include "math.h"
+#include "DWA.h"
 
 using namespace std;
 
@@ -81,6 +82,8 @@ struct robot {
 	bool on_job;
 	bool can_buy, can_sell;
 	bool on_coll;						//正在躲避碰撞
+	bool on_near;
+	int near_face;						//左右躲避
 	int coll_count;
 	int coll_num_wait, coll_num_hide;	//记录当前正在给谁让路
 	pair<double, double> object_target;
@@ -147,6 +150,7 @@ class Command
 	void coll_angle_caculate(const pair<double, double>& target, const pair<double, double>& cur, const double& t_face, const double& c_face, double& angle, double base);
 	bool can_select(const route& cur);
 	bool route_caculate(const route& cur, const robot& rb, double& maxValue, double& maxLength, double& score, bool is_first);
+	void really_near(const robot& target, robot& check, double pi);
 
 	void Clean_list();
 	void flush_list();

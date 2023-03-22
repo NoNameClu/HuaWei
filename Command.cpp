@@ -1,6 +1,6 @@
 #include "Command.h"
 
-//#define DEBUG
+#define DEBUG
 
 const unordered_set<int> Command::style{ 1,2,3,4,5,6,7,8,9 };
 
@@ -18,7 +18,7 @@ void Command::start()
 	while (ReadUntilOK()) {
 		UpdateInfo();
 		Add_frame();
-		RobotColl();
+		//RobotColl();
 		RobotDoWork();
 		Add_work();
 		RobotSelectWork();
@@ -99,6 +99,7 @@ void Command::initMap()
 			if (buf[j][i] == 'A') {		// 机器人
 				robot temp;
 				temp.state = NONE;
+				temp.on_near = false;
 				robots.push_back(temp);
 			}
 			if (style.find(buf[j][i] - '0') != style.end()) {	// 工作台
@@ -252,41 +253,42 @@ void Command::UpdateInfo()
 		s_for >> real_pos.second;
 		tmp.real_pos = real_pos;	//	坐标转化
 		realTomap(tmp.real_pos, tmp.pos);
+		int id = tmp.pos.first * 100 + tmp.pos.second;
+		worker& temp_w = idToworker[id];
 
 		int time;
 		s_for >> time;		// 工作台剩余的生产时间（没有用到）
-		tmp.time = time;
-		s_for >> tmp.hold_object;
-		s_for >> tmp.output;
+		temp_w.time = time;
+		s_for >> temp_w.hold_object;
+		s_for >> temp_w.output;
 
-		int id = tmp.pos.first * 100 + tmp.pos.second;
-		// tmp2记录了此工作台上一帧的状态，但还没有与当前帧比较判错
-		if (tmp.output) {
+		
+		// temp_w2记录了此工作台上一帧的状态，但还没有与当前帧比较判错
+		if (temp_w.output) {
 			takeoff_product_stat(id);
 		}
-		if (tmp.style > 3 && tmp.output) {
+		if (temp_w.style > 3 && temp_w.output) {
 			over_num++;
 		}
-		if (tmp.style == 7 && tmp.time < 0) {
-			int temp = (OBJECT_FOUR | OBJECT_FIVE | OBJECT_SIX) & tmp.hold_object;
-#ifdef DEBUG
-			cerr << "temp: " << temp << " " << tmp.need_object << " " << tmp.hold_object << endl;
-#endif // DEBUG
-			temp = ~temp;
-			if ((OBJECT_FOUR & temp) == 0) {
-				seven_need |= OBJECT_FOUR;
-				++se_Need[4];
-			}
-			if ((OBJECT_FIVE & temp) == 0) {
-				seven_need |= OBJECT_FIVE;
-				++se_Need[5];
-			}
-			if ((OBJECT_SIX & temp) == 0) {
-				seven_need |= OBJECT_SIX;
-				++se_Need[6];
-			}
-		}
-		idToworker[id] = tmp;
+//		if (temp_w.style == 7 && temp_w.time < 0) {
+//			int temp = temp_w.need_object & temp_w.hold_object;
+//#ifdef DEBUG
+//			cerr << "temp: " << temp << " " << temp_w.need_object << " " << temp_w.hold_object << endl;
+//#endif // DEBUG
+//			temp = ~temp;
+//			if ((OBJECT_FOUR & temp) != 0) {
+//				seven_need |= OBJECT_FOUR;
+//				++se_Need[4];
+//			}
+//			if ((OBJECT_FIVE & temp) != 0) {
+//				seven_need |= OBJECT_FIVE;
+//				++se_Need[5];
+//			}
+//			if ((OBJECT_SIX & temp) != 0) {
+//				seven_need |= OBJECT_SIX;
+//				++se_Need[6];
+//			}
+//		}
 	}
 
 #ifdef DEBUG
@@ -357,29 +359,30 @@ void Command::UpdateInfo()
 		}*/
 	}
 
-	for (int i = 0; i < robots.size(); ++i) {
-		double distance = 999;
-		int index = i;
-		for (int j = 0; j < robots.size(); ++j) {
-			if (i == j || robots[i].on_coll) {
-				continue;
-			}
-			if (IsOnmyway(robots[j], robots[i], M_PI_8)) {
-				robots[i].on_coll = true;
-				robots[i].coll_count = frame;
-				robots[i].coll_num_hide |= (1 << (j + 1));
-				double dis_temp = GetLength(robots[i].real_pos, robots[j].real_pos);
-				if (dis_temp < distance) {
-					distance = dis_temp;
-					index = j;
-				}
-			}
-			else {
-				robots[i].coll_num_hide &= (~(1 << (j + 1)));
-			}
-			robots_coll_map[i] = distance > COLL_RADIUS ? robots_coll_map[i] : index;
-		}
-	}
+	//for (int i = 0; i < robots.size(); ++i) {
+	//	double distance = 999;
+	//	int index = i;
+	//	for (int j = 0; j < robots.size(); ++j) {
+	//		//really_near(robots[j], robots[i], M_PI_8);
+	//		if (i == j || robots[i].on_coll) {
+	//			continue;
+	//		}
+	//		if (IsOnmyway(robots[j], robots[i], M_PI_8)) {
+	//			robots[i].on_coll = true;
+	//			robots[i].coll_count = frame;
+	//			robots[i].coll_num_hide |= (1 << (j + 1));
+	//			double dis_temp = GetLength(robots[i].real_pos, robots[j].real_pos);
+	//			if (dis_temp < distance) {
+	//				distance = dis_temp;
+	//				index = j;
+	//			}
+	//		}
+	//		else {
+	//			robots[i].coll_num_hide &= (~(1 << (j + 1)));
+	//		}
+	//		robots_coll_map[i] = distance > COLL_RADIUS ? robots_coll_map[i] : index;
+	//	}
+	//}
 
 	/*if (flag && stat == WRONG) {
 		stat = NORMAL;
@@ -458,12 +461,34 @@ void Command::RobotDoWork()
 			continue;
 		}
 
-		double speed, angle;
-		normal_caculate(rt.object_target, rt.real_pos, rt.face, speed, angle);
+		DWA better_way;
 
-		angle_s.push_back(make_pair(i, angle));
-		forward_s.push_back(make_pair(i, speed));
-}
+		if (rt.state == BEFORE) {
+			better_way.set_var(19, 19);
+		}
+		else {
+			better_way.set_var(14, 10);
+		}
+
+		double lspeed = sqrt((rt.l_speed.first * rt.l_speed.first) + (rt.l_speed.second * rt.l_speed.second));
+		VectorXd state = make_tuple(rt.real_pos.first, rt.real_pos.second, rt.face, lspeed, rt.a_speed);
+
+		vector<Vector2d> obs;
+		for (int j = 0; j < robots.size(); ++j) {
+			if (i == j) {
+				continue;
+			}
+			obs.push_back(robots[j].real_pos);
+		}
+		auto best_choice = better_way.trajectoryEvaluation(state, rt.object_target, obs);
+
+#ifdef DEBUG
+		cerr << best_choice.first[0] << " " << best_choice.first[1] << endl;
+#endif // DEBUG
+
+		angle_s.push_back(make_pair(i, best_choice.first[0]));
+		forward_s.push_back(make_pair(i, best_choice.first[1]));
+	}
 
 	flush_money_stat();
 	flush_list();
@@ -499,6 +524,14 @@ void Command::RobotSelectWork()
 		robots[i].cur = my_route;
 		robots[i].on_job = true;
 		robots[i].state = BEFORE;
+
+		if (seven_need != OBJECT_NULL && (my_route.object & seven_need) != 0) {
+			const worker& temp = idToworker[my_route.start];
+			se_Need[temp.style] = max(se_Need[temp.style] - 1, 0);
+			if (se_Need[temp.style] == 0) {
+				seven_need &= (~(my_route.object));
+			}
+		}
 	}
 }
 
@@ -537,6 +570,12 @@ void Command::RobotColl()
 			forward_s.push_back(make_pair(i, speed));
 		}
 		visit.insert(i);
+	}
+
+	for (int i = 0; i < robots.size(); ++i) {
+		if (robots[i].on_near && !robots[i].on_coll) {
+			angle_s.push_back(make_pair(i, M_PI_4 * robots[i].near_face));
+		}
 	}
 }
 
@@ -745,9 +784,9 @@ bool Command::route_caculate(const route& cur, const robot& rb, double& maxValue
 	if (lastbuyselect * (9000 - frame) < distance) {
 		return false;
 	}
-	/*if ((cur.object & seven_need) != 0 && route_end_worker.time < 0) {
-		value_add += 30000;
-	}*/
+	if ((cur.object & seven_need) != 0 && route_end_worker.time >= 0) {
+		return false;
+	}
 	if (is_first) {
 		maxValue = max(maxValue, value_add);
 		maxLength = max(maxLength, distance);
@@ -759,6 +798,28 @@ bool Command::route_caculate(const route& cur, const robot& rb, double& maxValue
 		score = temp_value * VALUE_WEIGHT + distance * LENGTH_WEIGHT;	//	权重都置0.5
 	}
 	return true;
+}
+
+void Command::really_near(const robot& target, robot& check, double pi)
+{
+	double x = target.real_pos.second - check.real_pos.second,
+		y = (target.real_pos.first - check.real_pos.first);
+	double target_angle = atan2(x, y);	//	计算目标角度与x正半轴夹角
+	double a_diff = target_angle + (-check.face);	//	计算目标角度与朝向的差值
+	if (a_diff > M_PI) {
+		a_diff -= 2 * M_PI;
+	}
+	else if (a_diff < (-M_PI)) {
+		a_diff += 2 * M_PI;
+	}
+	check.near_face = a_diff > 0 ? -1 : 1;
+	a_diff = abs(a_diff);
+	if (a_diff > pi && isNear(target.real_pos, check.real_pos, 1.2)) {
+		check.on_near = true;
+	}
+	else {
+		check.on_near = false;
+	}
 }
 
 //	清除avaliable，重置unavaliable
