@@ -1,8 +1,20 @@
 #include "Command.h"
 
-#define DEBUG
+//#define DEBUG
 
 const unordered_set<int> Command::style{ 1,2,3,4,5,6,7,8,9 };
+
+const unordered_set<int> id1{ 4998, 101, 9801,
+							4034, 4331,
+							5840,
+							5228,
+							4637, 5237, 4937 };
+
+const unordered_set<int> id2{ 4998, 9898, 101, 4901 };
+
+const unordered_set<int> id3{ 8239, 9539, 9452, 8265, 9465, 9841, 9855 };
+
+const unordered_set<int> id4{ 4952, 4942, 4902 };
 
 void Command::init()
 {
@@ -18,7 +30,7 @@ void Command::start()
 	while (ReadUntilOK()) {
 		UpdateInfo();
 		Add_frame();
-		//RobotColl();
+		RobotColl();
 		RobotDoWork();
 		Add_work();
 		RobotSelectWork();
@@ -94,12 +106,14 @@ void Command::initMap()
 
 	total_num = 0;
 	mid_count = 0;
+	product[4] = 0, product[5] = 0, product[6] = 0;
+	need[4] = 0, need[5] = 0, need[6] = 0;
+	min_need = 10000, min_product = 10000;
 	for (int j = buf.size() - 1; j >= 0; --j) {
 		for (int i = 0; i < buf[0].size(); ++i) {
 			if (buf[j][i] == 'A') {		// 机器人
 				robot temp;
 				temp.state = NONE;
-				temp.on_near = false;
 				robots.push_back(temp);
 			}
 			if (style.find(buf[j][i] - '0') != style.end()) {	// 工作台
@@ -110,9 +124,6 @@ void Command::initMap()
 				temp.pos = pos;
 				temp.real_pos = real_pos;
 				temp.style = buf[j][i] - '0';
-				if(temp.style > 3 && temp.style <= 7){
-					total_num++;
-				}
 				switch (temp.style) {
 				case 1:
 					temp.need_money = 3000;
@@ -169,7 +180,58 @@ void Command::initMap()
 					break;
 				}
 				idToworker[i * 100 + (buf.size() - 1 - j)] = temp;
+#ifdef DEBUG
+				cerr << i * 100 + (buf.size() - 1 - j) << endl;
+#endif // DEBUG
+
 			}
+		}
+	}
+	map_id = idToworker.size();
+
+	if (map_id == 43) {
+		for (auto p = idToworker.begin(); p != idToworker.end();) {
+			if (id1.find(p->first) == id1.end()) {
+				p = idToworker.erase(p);
+			}
+			else {
+				++p;
+			}
+		}
+	}
+	else if (map_id == 50) {
+		/*for (auto p = idToworker.begin(); p != idToworker.end();) {
+			if (p->second.style == 4) {
+				p = idToworker.erase(p);
+			}
+			else {
+				++p;
+			}
+		}*/
+	}
+	else if (map_id == 18) {
+		for (auto p = idToworker.begin(); p != idToworker.end();) {
+			if (p->second.style > 3 && p->second.style < 7) {
+				if (id4.find(p->first) == id4.end()) {
+					p = idToworker.erase(p);
+					continue;
+				}
+			}
+			++p;
+		}
+	}
+	else if (map_id == 25) {
+		for (auto p = idToworker.begin(); p != idToworker.end();) {
+			if (id2.find(p->first) != id2.end()) {
+				p = idToworker.erase(p);
+			}
+			++p;
+		}
+	}
+
+	for (const auto& [id, wo] : idToworker) {
+		if (wo.style > 3 && wo.style <= 6) {
+			++total_num;
 		}
 	}
 
@@ -190,7 +252,14 @@ void Command::initMap()
 			route temp(start_id, end_id);
 			temp.base = start.need_money;
 			temp.value = start.sell_money - start.need_money;
-			if (end.style >= 4 && end.style <= 6) {
+			if (map_id == 18 && end.style == 4) {
+				temp.value += 100000;
+			}
+			else if (map_id == 25 && (start.style == 6 || end.style == 6)) {
+				temp.value += 9000;
+			}
+			if (end.style >= 4 && end.style <= 6)
+			{
 				temp.value += (end.sell_money - end.need_money) * MID_WEIGHT;
 			}
 			else if (end.style == 7) {
@@ -199,6 +268,16 @@ void Command::initMap()
 			temp.object = start.product_object;
 			temp.length = GetLength(start.real_pos, end.real_pos);
 			temp.stat = NO_PRODUCT;
+			if (map_id == 43) {
+				if (end.style > 7 && start.style < 7) {
+					continue;
+				}
+			}
+			else if (map_id == 50) {
+				/*if (end.style > 7 && start.style < 6) {
+					continue;
+				}*/
+			}
 			unavaliable.push_back(temp);
 		}
 	}
@@ -240,6 +319,8 @@ void Command::UpdateInfo()
 	int n = worker_num;
 	int over_num = 0;
 	seven_need = OBJECT_NULL;
+	product[4] = 0, product[5] = 0, product[6] = 0;
+	min_product = 100000;
 	while (n--) {
 		//	读第3到n+3行
 		a = buf[index++];
@@ -263,37 +344,44 @@ void Command::UpdateInfo()
 		s_for >> temp_w.output;
 
 		
-		// temp_w2记录了此工作台上一帧的状态，但还没有与当前帧比较判错
+		// tmp2记录了此工作台上一帧的状态，但还没有与当前帧比较判错
 		if (temp_w.output) {
 			takeoff_product_stat(id);
 		}
 		if (temp_w.style > 3 && temp_w.output) {
 			over_num++;
 		}
-//		if (temp_w.style == 7 && temp_w.time < 0) {
-//			int temp = temp_w.need_object & temp_w.hold_object;
+		if (temp_w.style > 3 && temp_w.style < 7 && temp_w.time >= 0) {
+			++product[temp_w.style];
+		}
+//		if (tmp.style == 7 && tmp.time < 0) {
+//			int temp = (OBJECT_FOUR | OBJECT_FIVE | OBJECT_SIX) & tmp.hold_object;
 //#ifdef DEBUG
-//			cerr << "temp: " << temp << " " << temp_w.need_object << " " << temp_w.hold_object << endl;
+//			cerr << "temp: " << temp << " " << tmp.need_object << " " << tmp.hold_object << endl;
 //#endif // DEBUG
 //			temp = ~temp;
-//			if ((OBJECT_FOUR & temp) != 0) {
+//			if ((OBJECT_FOUR & temp) == 0) {
 //				seven_need |= OBJECT_FOUR;
 //				++se_Need[4];
 //			}
-//			if ((OBJECT_FIVE & temp) != 0) {
+//			if ((OBJECT_FIVE & temp) == 0) {
 //				seven_need |= OBJECT_FIVE;
 //				++se_Need[5];
 //			}
-//			if ((OBJECT_SIX & temp) != 0) {
+//			if ((OBJECT_SIX & temp) == 0) {
 //				seven_need |= OBJECT_SIX;
 //				++se_Need[6];
 //			}
 //		}
 	}
 
-#ifdef DEBUG
-	cerr << "info, seven_need:" << seven_need << endl;
-#endif // DEBUG
+//#ifdef DEBUG
+//	cerr << "info, seven_need:" << seven_need << endl;
+//#endif // DEBUG
+
+	for (const auto& [style, count] : product) {
+		min_product = min(min_product, count);
+	}
 
 
 	if (over_num > (total_num * OVER)) {
@@ -309,6 +397,13 @@ void Command::UpdateInfo()
 	bool flag = true;
 
 	for (int i = 0; i < robots.size(); i++) {
+		double coll_frame = 9;
+		if (map_id == 50) {
+			coll_frame = 7;
+		}
+		if (map_id == 25) {
+			coll_frame = 3;
+		}
 		a = buf[index++];
 		stringstream s_for;
 		s_for.str(a);
@@ -336,6 +431,13 @@ void Command::UpdateInfo()
 		robots[i].coll_angle = 0;
 		robots[i].can_buy = false;
 		robots[i].can_sell = false;
+		robots[i].on_side = false;
+		if (item != 0) {
+			robots[i].hold_some = true;
+		}
+		else {
+			robots[i].hold_some = false;
+		}
 		
 		if (robots[i].on_job) {
 			if (robots[i].state == BEFORE && isNear(robots[i].real_pos, idToworker[robots[i].cur.start].real_pos, 0.4)) {
@@ -346,8 +448,9 @@ void Command::UpdateInfo()
 			}
 		}
 
-		if (robots[i].on_coll && frame - robots[i].coll_count >= 5) {
+		if (robots[i].on_coll && frame - robots[i].coll_count >= coll_frame) {
 			robots[i].on_coll = false;
+			robots_coll_map[i] = -1;
 		}
 
 		if (robots[i].state == AFTER && item == 0) {
@@ -359,30 +462,37 @@ void Command::UpdateInfo()
 		}*/
 	}
 
-	//for (int i = 0; i < robots.size(); ++i) {
-	//	double distance = 999;
-	//	int index = i;
-	//	for (int j = 0; j < robots.size(); ++j) {
-	//		//really_near(robots[j], robots[i], M_PI_8);
-	//		if (i == j || robots[i].on_coll) {
-	//			continue;
-	//		}
-	//		if (IsOnmyway(robots[j], robots[i], M_PI_8)) {
-	//			robots[i].on_coll = true;
-	//			robots[i].coll_count = frame;
-	//			robots[i].coll_num_hide |= (1 << (j + 1));
-	//			double dis_temp = GetLength(robots[i].real_pos, robots[j].real_pos);
-	//			if (dis_temp < distance) {
-	//				distance = dis_temp;
-	//				index = j;
-	//			}
-	//		}
-	//		else {
-	//			robots[i].coll_num_hide &= (~(1 << (j + 1)));
-	//		}
-	//		robots_coll_map[i] = distance > COLL_RADIUS ? robots_coll_map[i] : index;
-	//	}
-	//}
+	if (map_id != 25) {
+		for (int i = 0; i < robots.size(); ++i) {
+			double distance = 999;
+			int index = i;
+			for (int j = 0; j < robots.size(); ++j) {
+				if (i == j || robots[i].on_coll) {
+					continue;
+				}
+				if (IsOnmyway(robots[j], robots[i], COLL_ANGLE)) {
+					robots[i].on_coll = true;
+					robots[i].coll_count = frame;
+					robots[i].coll_num_hide |= (1 << (j + 1));
+					double dis_temp = GetLength(robots[i].real_pos, robots[j].real_pos);
+					if (dis_temp < distance) {
+						distance = dis_temp;
+						index = j;
+					}
+				}
+				else {
+					robots[i].coll_num_hide &= (~(1 << (j + 1)));
+				}
+				robots_coll_map[i] = distance > COLL_RADIUS ? robots_coll_map[i] : index;
+			}
+		}
+	}
+
+	/*for (int i = 0; i < robots.size(); ++i) {
+		if (closeToside(robots[i])) {
+			robots[i].on_side = true;
+		}
+	}*/
 
 	/*if (flag && stat == WRONG) {
 		stat = NORMAL;
@@ -421,7 +531,19 @@ void Command::RobotDoWork()
 	for (int i = 0; i < robots.size(); ++i) {
 		robot& rt = robots[i];
 
-		if (!rt.on_job  || rt.on_coll ) {
+		if (!rt.on_job  || rt.on_coll) {
+			/*if (map_id == 43 && !rt.on_job) {
+				double speed, angle;
+				pair<double, double> target = make_pair(49.25, 0.75);
+				normal_caculate(target, rt.real_pos, rt.face, speed, angle);
+				angle_s.push_back(make_pair(i, angle));
+				if (!rt.on_side) {
+					forward_s.push_back(make_pair(i, speed));
+				}
+				else {
+					forward_s.push_back(make_pair(i, SIDE_SPEED));
+				}
+			}*/
 			continue;
 		}
 
@@ -461,33 +583,16 @@ void Command::RobotDoWork()
 			continue;
 		}
 
-		DWA better_way;
+		double speed, angle;
+		normal_caculate(rt.object_target, rt.real_pos, rt.face, speed, angle);
 
-		if (rt.state == BEFORE) {
-			better_way.set_var(19, 19);
+		angle_s.push_back(make_pair(i, angle));
+		if (!rt.on_side) {
+			forward_s.push_back(make_pair(i, speed));
 		}
 		else {
-			better_way.set_var(14, 10);
+			forward_s.push_back(make_pair(i, min(SIDE_SPEED, speed)));
 		}
-
-		double lspeed = sqrt((rt.l_speed.first * rt.l_speed.first) + (rt.l_speed.second * rt.l_speed.second));
-		VectorXd state = make_tuple(rt.real_pos.first, rt.real_pos.second, rt.face, lspeed, rt.a_speed);
-
-		vector<Vector2d> obs;
-		for (int j = 0; j < robots.size(); ++j) {
-			if (i == j) {
-				continue;
-			}
-			obs.push_back(robots[j].real_pos);
-		}
-		auto best_choice = better_way.trajectoryEvaluation(state, rt.object_target, obs);
-
-#ifdef DEBUG
-		cerr << best_choice.first[0] << " " << best_choice.first[1] << endl;
-#endif // DEBUG
-
-		angle_s.push_back(make_pair(i, best_choice.first[0]));
-		forward_s.push_back(make_pair(i, best_choice.first[1]));
 	}
 
 	flush_money_stat();
@@ -524,58 +629,81 @@ void Command::RobotSelectWork()
 		robots[i].cur = my_route;
 		robots[i].on_job = true;
 		robots[i].state = BEFORE;
-
-		if (seven_need != OBJECT_NULL && (my_route.object & seven_need) != 0) {
-			const worker& temp = idToworker[my_route.start];
-			se_Need[temp.style] = max(se_Need[temp.style] - 1, 0);
-			if (se_Need[temp.style] == 0) {
-				seven_need &= (~(my_route.object));
-			}
-		}
 	}
 }
 
 void Command::RobotColl()
 {
+	double hold_base = M_PI, no_hold_base = M_PI_2;
+	if (map_id == 18) {
+		no_hold_base = M_PI_W;
+		hold_base = M_PI3_2;
+	}
 	unordered_set<int> visit;
 	for (int i = 0; i < robots.size(); ++i) {
 		if (!robots[i].on_coll || visit.find(i) != visit.end()) {
 			continue;
 		}
+#ifdef DEBUG
+		cerr << "机器人" << i << "避障" << endl;
+#endif // DEBUG
+
 
 		double angle, speed, trash;
 		int another = robots_coll_map[i];
 		robot target = robots[robots_coll_map[i]], cur = robots[i];
-		double base = cur.state == AFTER ? M_PI : M_PI_2;
+		double base = (cur.state == AFTER ? hold_base : no_hold_base);
 		coll_angle_caculate(target.real_pos, cur.real_pos, target.face, cur.face, angle, base);
 		normal_caculate(cur.object_target, cur.real_pos, cur.face, speed, trash);
+
+#ifdef DEBUG
+		cerr << i << "机器人speed:" << speed << "angle:" << angle << endl;
+#endif // DEBUG
+
 		if (i == robots_coll_map[another]) {
+#ifdef DEBUG
+			cerr << "机器人" << another << "避障k" << endl;
+#endif // DEBUG
 			double d_angle = 0, d_speed = 0;
-			double base = target.state == AFTER ? M_PI : M_PI_2;
-			coll_angle_caculate(cur.real_pos, target.real_pos, cur.face, target.face, angle, base);
+			double base = (target.state == AFTER ? hold_base : no_hold_base);
+			coll_angle_caculate(cur.real_pos, target.real_pos, cur.face, target.face, d_angle, base);
 			normal_caculate(target.object_target, target.real_pos, target.face, d_speed, trash);
+
 			visit.insert(another);
-			if (angle * d_angle > 0) {
+			if (angle * d_angle < 0) {
 				angle_s.push_back(make_pair(another, -d_angle));
+#ifdef DEBUG
+				cerr << i << "机器人speed:" << d_speed << "angle:" << -d_angle << endl;
+#endif // DEBUG
 			}
 			else {
 				angle_s.push_back(make_pair(another, d_angle));
+#ifdef DEBUG
+				cerr << i << "机器人speed:" << d_speed << "angle:" << d_angle << endl;
+#endif // DEBUG
 			}
-			if (d_speed < 3) {
-				forward_s.push_back(make_pair(another, d_speed));
+			if (d_speed < 3 ) {
+				if (map_id == 43 || map_id == 18) {
+					d_speed = speed;
+				}
+				if (!target.on_side) {
+					forward_s.push_back(make_pair(another, d_speed));
+				}
+				else {
+					forward_s.push_back(make_pair(another, min(SIDE_SPEED, d_speed)));
+				}
 			}
 		}
 		angle_s.push_back(make_pair(i, angle));
 		if (speed < 3) {
-			forward_s.push_back(make_pair(i, speed));
+			if (!cur.on_side) {
+				forward_s.push_back(make_pair(i, speed));
+			}
+			else {
+				forward_s.push_back(make_pair(i, min(SIDE_SPEED, speed)));
+			}
 		}
 		visit.insert(i);
-	}
-
-	for (int i = 0; i < robots.size(); ++i) {
-		if (robots[i].on_near && !robots[i].on_coll) {
-			angle_s.push_back(make_pair(i, M_PI_4 * robots[i].near_face));
-		}
 	}
 }
 
@@ -591,13 +719,13 @@ bool Command::GetRoute(const robot& rb, route& ret)
 	}
 
 	for (const auto& cur_route : maybe_avaliable) {
-		if (!can_select(cur_route)) {
-			continue;
-		}
-		if (idToworker[cur_route.start].time <= 0) {
-			continue;
-		}
-		route_caculate(cur_route, rb, maxValue, maxDistance, score, true);
+if (!can_select(cur_route)) {
+	continue;
+}
+if (idToworker[cur_route.start].time <= 0) {
+	continue;
+}
+route_caculate(cur_route, rb, maxValue, maxDistance, score, true);
 	}
 	//	将归一化和正向化之后的指标加权赋分给路线，然后放进priority_queue
 
@@ -635,6 +763,11 @@ bool Command::GetRoute(const robot& rb, route& ret)
 	}
 
 	ret = pq.top().second;
+	/*worker start = idToworker[ret.start];
+	se_Need[start.style] = min(se_Need[start.style] - 1, 0);
+	if (se_Need[start.style] == 0) {
+		seven_need &= (~(1 << start.style));
+	}*/
 #ifdef DEBUG
 	cerr << "seven_need:" << seven_need << endl;
 #endif // DEBUG
@@ -684,6 +817,9 @@ bool Command::IsOnmyway(const robot& target, const robot& check, double pi)
 	}
 	a_diff = abs(a_diff);
 	if (a_diff <= pi && isNear(target.real_pos, check.real_pos, COLL_RADIUS)) {
+		return true;
+	}
+	if ((outline_check(target, check, pi) && a_diff <= OUTLINE_RADIUS) && isNear(target.real_pos, check.real_pos, COLL_RADIUS)) {
 		return true;
 	}
 	return false;
@@ -737,6 +873,17 @@ void Command::normal_caculate(const pair<double, double>& target, const pair<dou
 		speed = 6;
 		angle = 0;
 	}
+
+	if (map_id == 43) {
+		if (target.first <= 1 || target.first >= 49 || target.second <= 1 || target.second >= 49) {
+			if (cur.first <= 2 || cur.first >= 48 || cur.second <= 2 || cur.second >= 48) {
+				return;
+			}
+			if (distance >= 2) {
+				angle -= M_PI_4;
+			}
+		}
+	}
 }
 
 void Command::coll_angle_caculate(const pair<double, double>& target, const pair<double, double>& cur, const double& t_face, const double& c_face, double& angle, double base)
@@ -761,65 +908,85 @@ void Command::coll_angle_caculate(const pair<double, double>& target, const pair
 	angle = base * dir * (face_dif > M_PI_H ? face_dir : 1);
 }
 
+bool Command::route_caculate(const route& cur_route, const robot& rb, double& maxValue, double& maxDistance, double& score, bool is_first)
+{
+	worker route_start_worker = idToworker[cur_route.start];
+	pair<double, double> cur_worker_pos = route_start_worker.real_pos;
+	double distance = GetLength(rb.real_pos, cur_worker_pos); //	计算机器人到起始点距离
+	if (cur_route.stat == NO_PRODUCT && (lengthOneFrame * route_start_worker.time) > distance) {
+		return false;
+	}
+	distance += cur_route.length;
+	if (lastbuyselect * (9000 - frame) < distance) {
+		return false;
+	}
+	if (is_first) {
+		maxValue = max(maxValue, cur_route.value);
+		maxDistance = max(maxDistance, distance);
+	}
+	else {
+		distance = distance / maxDistance;	//路线越小越好，这是一个极小型指标
+		double temp_value;
+		temp_value = 1 - cur_route.value / maxValue;	// 价值越大越好，这一个极大型指标，需要正向化
+		score = temp_value * VALUE_WEIGHT + distance * LENGTH_WEIGHT;	//	权重都置0.5
+	}
+	return true;
+}
+
 bool Command::can_select(const route& cur)
 {
 	worker route_start_worker = idToworker[cur.start];
 	if (stat == MIDP_OVER && route_start_worker.style <= 3) {
 		return false;
 	}
-	return true;
-}
-
-bool Command::route_caculate(const route& cur, const robot& rb, double& maxValue, double& maxLength, double& score, bool is_first)
-{
-	worker route_start_worker = idToworker[cur.start];
-	worker route_end_worker = idToworker[cur.end];
-	pair<double, double> cur_worker_pos = route_start_worker.real_pos;
-	double distance = GetLength(rb.real_pos, cur_worker_pos); //	计算机器人到起始点距离
-	double value_add = cur.value;
-	if (route_start_worker.output == 0 && (lengthOneFrame * route_start_worker.time) > distance) {
-		return false;
-	}
-	distance += cur.length;
-	if (lastbuyselect * (9000 - frame) < distance) {
-		return false;
-	}
-	if ((cur.object & seven_need) != 0 && route_end_worker.time >= 0) {
-		return false;
-	}
-	if (is_first) {
-		maxValue = max(maxValue, value_add);
-		maxLength = max(maxLength, distance);
-	}
-	else {
-		distance = distance / maxLength;	//路线越小越好，这是一个极小型指标
-		double temp_value = 0;
-		temp_value = 1 - value_add / maxValue;	// 价值越大越好，这一个极大型指标，需要正向化	
-		score = temp_value * VALUE_WEIGHT + distance * LENGTH_WEIGHT;	//	权重都置0.5
+	if (seven_need != OBJECT_NULL) {
+		if (stat == MIDP_OVER && (route_start_worker.product_object & seven_need) == 0) {
+			return false;
+		}
 	}
 	return true;
 }
 
-void Command::really_near(const robot& target, robot& check, double pi)
+bool Command::closeToside(const robot& cur)
 {
-	double x = target.real_pos.second - check.real_pos.second,
-		y = (target.real_pos.first - check.real_pos.first);
-	double target_angle = atan2(x, y);	//	计算目标角度与x正半轴夹角
-	double a_diff = target_angle + (-check.face);	//	计算目标角度与朝向的差值
-	if (a_diff > M_PI) {
-		a_diff -= 2 * M_PI;
+	int x = cur.real_pos.first, y = cur.real_pos.second;
+	double timex1 = abs((x - 0.5) / cur.l_speed.first), timex2 = abs((49.5 - x) / cur.l_speed.second);
+	double timey1 = abs((y - 0.5) / cur.l_speed.second), timey2 = abs((49.5 - y) / cur.l_speed.second);
+#ifdef DEBUG
+	cerr << timex1 << " " << timex2 << " " << timey1 << " " << timey2 << endl;
+#endif // DEBUG
+
+ 	/*if (x <= 0.5 || x >= 49.5) {
+		return true;
 	}
-	else if (a_diff < (-M_PI)) {
-		a_diff += 2 * M_PI;
+	if (y <= 0.5 || y >= 49.5) {
+		return true;
+	}*/
+	if (min(timex1, timex2) <= 0.3) {
+		return true;
 	}
-	check.near_face = a_diff > 0 ? -1 : 1;
-	a_diff = abs(a_diff);
-	if (a_diff > pi && isNear(target.real_pos, check.real_pos, 1.2)) {
-		check.on_near = true;
+	if (min(timey1, timey2) <= 0.3) {
+		return true;
 	}
-	else {
-		check.on_near = false;
+	return false;
+}
+
+bool Command::outline_check(const robot& target, const robot& check, double pi)
+{
+	double k1 = tan(check.face + pi);
+	double k2 = tan(check.face - pi);
+	double x1 = check.real_pos.first, y1 = check.real_pos.second;
+	double x2 = target.real_pos.first, y2 = target.real_pos.second;
+	double dis1 = abs(k1 * (x2 - x1) - (y2 - y1)) / sqrt(k1 * k1 + 1);
+	double dis2 = abs(k2 * (x2 - x1) - (y2 - y1)) / sqrt(k2 * k2 + 1);
+	if (dis1 < target.state == AFTER ? 0.53 : 0.45) {
+		return true;
 	}
+	if (dis2 < target.state == AFTER ? 0.53 : 0.45) {
+		return true;
+	}
+
+	return false;
 }
 
 //	清除avaliable，重置unavaliable

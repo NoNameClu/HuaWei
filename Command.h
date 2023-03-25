@@ -12,7 +12,6 @@
 #include <sstream>
 
 #include "math.h"
-#include "DWA.h"
 
 using namespace std;
 
@@ -41,7 +40,10 @@ const double VALUE_WEIGHT = 0.2;
 const double LENGTH_WEIGHT = 0.8;
 const double MID_WEIGHT = 0.0;
 const double FIN_WEIGHT = 0.0;
+const double SIDE_SPEED = 0.1;
 const double COLL_RADIUS = 3.5;
+const double COLL_ANGLE = M_PI_8;
+const double OUTLINE_RADIUS = M_PI_6;
 
 enum robot_state {
 	//添加none状态，表示现在没有分配工作
@@ -82,8 +84,7 @@ struct robot {
 	bool on_job;
 	bool can_buy, can_sell;
 	bool on_coll;						//正在躲避碰撞
-	bool on_near;
-	int near_face;						//左右躲避
+	bool on_side, hold_some;						//边界周围
 	int coll_count;
 	int coll_num_wait, coll_num_hide;	//记录当前正在给谁让路
 	pair<double, double> object_target;
@@ -116,6 +117,9 @@ class Command
 	int total_num;
 	int mid_count;
 	int seven_need = OBJECT_NULL;
+	int map_id;
+	int min_product, min_need;
+	unordered_map<int, int> product, need;
 	unordered_map<int, int> se_Need;
 	Command_stat stat;
 	list<route> avaliable, unavaliable, maybe_avaliable;		//可用路线，不可用路线, 可能可用的路线（只有因为产品没生产导致不可用的队列）
@@ -148,9 +152,10 @@ class Command
 	bool IsOnmyway(const robot& target, const robot& check, double pi);
 	void normal_caculate(const pair<double, double>& target, const pair<double, double>& cur, const double& face, double& speed, double& angle);
 	void coll_angle_caculate(const pair<double, double>& target, const pair<double, double>& cur, const double& t_face, const double& c_face, double& angle, double base);
+	bool route_caculate(const route& cur_route, const robot& rb, double& maxValue, double& distance, double& score, bool is_first);
 	bool can_select(const route& cur);
-	bool route_caculate(const route& cur, const robot& rb, double& maxValue, double& maxLength, double& score, bool is_first);
-	void really_near(const robot& target, robot& check, double pi);
+	bool closeToside(const robot& cur);
+	bool outline_check(const robot& target, const robot& check, double pi);
 
 	void Clean_list();
 	void flush_list();
