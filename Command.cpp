@@ -4,18 +4,6 @@
 
 const unordered_set<int> Command::style{ 1,2,3,4,5,6,7,8,9 };
 
-const unordered_set<int> id1{ 4998, 101, 9801,
-							4034, 4331,
-							5840,
-							5228,
-							4637, 5237, 4937 };
-
-const unordered_set<int> id2{ 4998, 9898, 101, 4901 };
-
-const unordered_set<int> id3{ 8239, 9539, 9452, 8265, 9465, 9841, 9855 };
-
-const unordered_set<int> id4{ 4952, 4942, 4902 };
-
 void Command::init()
 {
 	ReadUntilOK();
@@ -46,6 +34,11 @@ bool Command::ReadUntilOK()
 	while (getline(cin, line)) {
 		if (line[0] == 'O' && line[1] == 'K')
 			return true;
+
+//#ifdef DEBUG
+//		cerr << line << endl;
+//#endif // DEBUG
+
 
 		buf.push_back(line);
 	}
@@ -106,20 +99,22 @@ void Command::initMap()
 
 	total_num = 0;
 	mid_count = 0;
-	product[4] = 0, product[5] = 0, product[6] = 0;
-	need[4] = 0, need[5] = 0, need[6] = 0;
-	min_need = 10000, min_product = 10000;
+	map = buf;
 	for (int j = buf.size() - 1; j >= 0; --j) {
 		for (int i = 0; i < buf[0].size(); ++i) {
 			if (buf[j][i] == 'A') {		// 机器人
 				robot temp;
 				temp.state = NONE;
+				temp.object_target = make_pair(-1, -1);
 				robots.push_back(temp);
 			}
 			if (style.find(buf[j][i] - '0') != style.end()) {	// 工作台
+				if (!worker_avaliable(j, i)) {
+					continue;
+				}
 				worker temp;
-				pair<int, int> pos = make_pair(i, buf.size() - j - 1);	//	工作台int坐标
-				pair<double, double> real_pos;
+				pair<int, int> pos = make_pair(j, i);	//	工作台int坐标	横坐标在后，纵坐标在前（真实版
+				pair<double, double> real_pos;			//	横坐标在前，纵坐标在后（真实版
 				mapToreal(pos, real_pos);				//	int坐标转double实际坐标
 				temp.pos = pos;
 				temp.real_pos = real_pos;
@@ -179,53 +174,11 @@ void Command::initMap()
 				default:
 					break;
 				}
-				idToworker[i * 100 + (buf.size() - 1 - j)] = temp;
-#ifdef DEBUG
-				cerr << i * 100 + (buf.size() - 1 - j) << endl;
-#endif // DEBUG
-
+				idToworker[j * 100 + i] = temp;
 			}
-		}
-	}
-	map_id = idToworker.size();
-
-	if (map_id == 43) {
-		for (auto p = idToworker.begin(); p != idToworker.end();) {
-			if (id1.find(p->first) == id1.end()) {
-				p = idToworker.erase(p);
+			if (buf[j][i] == '#') {
+				obcTot.push_back(j * 100 + i);
 			}
-			else {
-				++p;
-			}
-		}
-	}
-	else if (map_id == 50) {
-		/*for (auto p = idToworker.begin(); p != idToworker.end();) {
-			if (p->second.style == 4) {
-				p = idToworker.erase(p);
-			}
-			else {
-				++p;
-			}
-		}*/
-	}
-	else if (map_id == 18) {
-		for (auto p = idToworker.begin(); p != idToworker.end();) {
-			if (p->second.style > 3 && p->second.style < 7) {
-				if (id4.find(p->first) == id4.end()) {
-					p = idToworker.erase(p);
-					continue;
-				}
-			}
-			++p;
-		}
-	}
-	else if (map_id == 25) {
-		for (auto p = idToworker.begin(); p != idToworker.end();) {
-			if (id2.find(p->first) != id2.end()) {
-				p = idToworker.erase(p);
-			}
-			++p;
 		}
 	}
 
@@ -234,6 +187,10 @@ void Command::initMap()
 			++total_num;
 		}
 	}
+#ifdef DEBUG
+	cerr << "工作台数量" << idToworker.size();
+#endif // DEBUG
+
 
 	robots_coll_map.resize(robots.size());
 	//循环判断计算路径
@@ -249,35 +206,18 @@ void Command::initMap()
 			if ((start.product_object & end.need_object) == 0) {	//	前面生产的是后面需要的，此路线才有效
 				continue;
 			}
+			double distance = 0;					//工作台之间的距离
+			vector<int> way = can_reach(start, end, distance);		//start节点可以碰到end节点就可以继续（BFS）
+			if (way.empty()) {
+				continue;
+			}
 			route temp(start_id, end_id);
 			temp.base = start.need_money;
 			temp.value = start.sell_money - start.need_money;
-			if (map_id == 18 && end.style == 4) {
-				temp.value += 100000;
-			}
-			else if (map_id == 25 && (start.style == 6 || end.style == 6)) {
-				temp.value += 9000;
-			}
-			if (end.style >= 4 && end.style <= 6)
-			{
-				temp.value += (end.sell_money - end.need_money) * MID_WEIGHT;
-			}
-			else if (end.style == 7) {
-				temp.value += (end.sell_money - end.need_money) * FIN_WEIGHT;
-			}
 			temp.object = start.product_object;
-			temp.length = GetLength(start.real_pos, end.real_pos);
+			temp.length = distance;
 			temp.stat = NO_PRODUCT;
-			if (map_id == 43) {
-				if (end.style > 7 && start.style < 7) {
-					continue;
-				}
-			}
-			else if (map_id == 50) {
-				/*if (end.style > 7 && start.style < 6) {
-					continue;
-				}*/
-			}
+			temp.line = way;
 			unavaliable.push_back(temp);
 		}
 	}
@@ -302,11 +242,6 @@ void Command::UpdateInfo()
 	int m_temp;
 	sa >> m_temp;
 
-	/*if (m_temp != money) {
-		stat = WRONG;
-		Clean_list();
-	}*/
-
 	money = m_temp;
 	flush_money_stat();
 
@@ -318,9 +253,6 @@ void Command::UpdateInfo()
 
 	int n = worker_num;
 	int over_num = 0;
-	seven_need = OBJECT_NULL;
-	product[4] = 0, product[5] = 0, product[6] = 0;
-	min_product = 100000;
 	while (n--) {
 		//	读第3到n+3行
 		a = buf[index++];
@@ -343,7 +275,7 @@ void Command::UpdateInfo()
 		s_for >> temp_w.hold_object;
 		s_for >> temp_w.output;
 
-		
+
 		// tmp2记录了此工作台上一帧的状态，但还没有与当前帧比较判错
 		if (temp_w.output) {
 			takeoff_product_stat(id);
@@ -351,36 +283,6 @@ void Command::UpdateInfo()
 		if (temp_w.style > 3 && temp_w.output) {
 			over_num++;
 		}
-		if (temp_w.style > 3 && temp_w.style < 7 && temp_w.time >= 0) {
-			++product[temp_w.style];
-		}
-//		if (tmp.style == 7 && tmp.time < 0) {
-//			int temp = (OBJECT_FOUR | OBJECT_FIVE | OBJECT_SIX) & tmp.hold_object;
-//#ifdef DEBUG
-//			cerr << "temp: " << temp << " " << tmp.need_object << " " << tmp.hold_object << endl;
-//#endif // DEBUG
-//			temp = ~temp;
-//			if ((OBJECT_FOUR & temp) == 0) {
-//				seven_need |= OBJECT_FOUR;
-//				++se_Need[4];
-//			}
-//			if ((OBJECT_FIVE & temp) == 0) {
-//				seven_need |= OBJECT_FIVE;
-//				++se_Need[5];
-//			}
-//			if ((OBJECT_SIX & temp) == 0) {
-//				seven_need |= OBJECT_SIX;
-//				++se_Need[6];
-//			}
-//		}
-	}
-
-//#ifdef DEBUG
-//	cerr << "info, seven_need:" << seven_need << endl;
-//#endif // DEBUG
-
-	for (const auto& [style, count] : product) {
-		min_product = min(min_product, count);
 	}
 
 
@@ -390,20 +292,10 @@ void Command::UpdateInfo()
 	else {
 		stat = NORMAL;
 	}
-	/*if (frame >= LAST_SELL_T) {
-		stat = FIN_OVER;
-	}*/
 
 	bool flag = true;
 
 	for (int i = 0; i < robots.size(); i++) {
-		double coll_frame = 9;
-		if (map_id == 50) {
-			coll_frame = 7;
-		}
-		if (map_id == 25) {
-			coll_frame = 3;
-		}
 		a = buf[index++];
 		stringstream s_for;
 		s_for.str(a);
@@ -438,7 +330,7 @@ void Command::UpdateInfo()
 		else {
 			robots[i].hold_some = false;
 		}
-		
+
 		if (robots[i].on_job) {
 			if (robots[i].state == BEFORE && isNear(robots[i].real_pos, idToworker[robots[i].cur.start].real_pos, 0.4)) {
 				robots[i].can_buy = true;
@@ -456,46 +348,30 @@ void Command::UpdateInfo()
 		if (robots[i].state == AFTER && item == 0) {
 			robots[i].state = BEFORE;
 		}
-
-		/*if (robots[i].l_speed.first != 0 || robots[i].l_speed.second != 0 || robots[i].a_speed != 0) {
-			flag = false;
-		}*/
-	}
-
-	if (map_id != 25) {
-		for (int i = 0; i < robots.size(); ++i) {
-			double distance = 999;
-			int index = i;
-			for (int j = 0; j < robots.size(); ++j) {
-				if (i == j || robots[i].on_coll) {
-					continue;
-				}
-				if (IsOnmyway(robots[j], robots[i], COLL_ANGLE)) {
-					robots[i].on_coll = true;
-					robots[i].coll_count = frame;
-					robots[i].coll_num_hide |= (1 << (j + 1));
-					double dis_temp = GetLength(robots[i].real_pos, robots[j].real_pos);
-					if (dis_temp < distance) {
-						distance = dis_temp;
-						index = j;
-					}
-				}
-				else {
-					robots[i].coll_num_hide &= (~(1 << (j + 1)));
-				}
-				robots_coll_map[i] = distance > COLL_RADIUS ? robots_coll_map[i] : index;
-			}
-		}
 	}
 
 	/*for (int i = 0; i < robots.size(); ++i) {
-		if (closeToside(robots[i])) {
-			robots[i].on_side = true;
+		double distance = 999;
+		int index = i;
+		for (int j = 0; j < robots.size(); ++j) {
+			if (i == j || robots[i].on_coll) {
+				continue;
+			}
+			if (IsOnmyway(robots[j], robots[i], COLL_ANGLE)) {
+				robots[i].on_coll = true;
+				robots[i].coll_count = frame;
+				robots[i].coll_num_hide |= (1 << (j + 1));
+				double dis_temp = GetLength(robots[i].real_pos, robots[j].real_pos);
+				if (dis_temp < distance) {
+					distance = dis_temp;
+					index = j;
+				}
+			}
+			else {
+				robots[i].coll_num_hide &= (~(1 << (j + 1)));
+			}
+			robots_coll_map[i] = distance > COLL_RADIUS ? robots_coll_map[i] : index;
 		}
-	}*/
-
-	/*if (flag && stat == WRONG) {
-		stat = NORMAL;
 	}*/
 
 	takeoff_need_stat();
@@ -504,46 +380,11 @@ void Command::UpdateInfo()
 
 void Command::RobotDoWork()
 {
-	//if (stat == WRONG) {	//	状态错误时，清空机器人物品
-	//	for (int i = 0; i < robots.size(); ++i) {
-	//		string first = "", second = "", third = "";
-	//		first += "forward ";
-	//		first += to_string(i);
-	//		first += " ";
-	//		first += to_string(0);
-	//		second += "rotate ";
-	//		second += to_string(i);
-	//		second += " ";
-	//		second += to_string(0);
-	//		third += "destroy ";
-	//		third += to_string(i);
-	//		response.push_back(first);
-	//		response.push_back(second);
-	//		response.push_back(third);
-	//		robots[i].can_buy = false;
-	//		robots[i].can_sell = false;
-	//	}
-	//	return;
-	//}
-
-
 	//循环判断哪些robot已经被选择了路线
 	for (int i = 0; i < robots.size(); ++i) {
 		robot& rt = robots[i];
 
-		if (!rt.on_job  || rt.on_coll) {
-			/*if (map_id == 43 && !rt.on_job) {
-				double speed, angle;
-				pair<double, double> target = make_pair(49.25, 0.75);
-				normal_caculate(target, rt.real_pos, rt.face, speed, angle);
-				angle_s.push_back(make_pair(i, angle));
-				if (!rt.on_side) {
-					forward_s.push_back(make_pair(i, speed));
-				}
-				else {
-					forward_s.push_back(make_pair(i, SIDE_SPEED));
-				}
-			}*/
+		if (!rt.on_job || rt.on_coll) {
 			continue;
 		}
 
@@ -574,10 +415,10 @@ void Command::RobotDoWork()
 
 		switch (rt.state) {
 		case BEFORE:
-			rt.object_target = idToworker[rt.cur.start].real_pos;
+			caculate_nextWay(rt, true);
 			break;
 		case AFTER:
-			rt.object_target = idToworker[rt.cur.end].real_pos;
+			caculate_nextWay(rt, false);
 			break;
 		case NONE:
 			continue;
@@ -586,13 +427,12 @@ void Command::RobotDoWork()
 		double speed, angle;
 		normal_caculate(rt.object_target, rt.real_pos, rt.face, speed, angle);
 
+#ifdef DEBUG
+		cerr << "机器人" << i << "目标" << rt.object_target.first << " " << rt.object_target.second << endl;
+#endif // DEBUG
+
 		angle_s.push_back(make_pair(i, angle));
-		if (!rt.on_side) {
-			forward_s.push_back(make_pair(i, speed));
-		}
-		else {
-			forward_s.push_back(make_pair(i, min(SIDE_SPEED, speed)));
-		}
+		forward_s.push_back(make_pair(i, speed));
 	}
 
 	flush_money_stat();
@@ -601,53 +441,40 @@ void Command::RobotDoWork()
 
 void Command::RobotSelectWork()
 {
-	/*if (stat == WRONG) {
-		for (int i = 0; i < robots.size(); ++i) {
-			robots[i].on_job = false;
-			return;
-		}
-	}*/
-
 	for (int i = 0; i < robots.size(); i++) {
-		robot rb = robots[i];
-		if (rb.on_job) continue;	// 当前机器人没有分配工作
+		if (robots[i].on_job) continue;	// 当前机器人没有分配工作
 
 		if (stat == MIDP_OVER && mid_count == 0) {
 			stat = NORMAL;
 		}
-#ifdef DEBUG
-		cerr << "状态 " << stat << " mid_count:" << mid_count << endl;
-#endif // DEBUG
-	
+
 		route my_route;
-		if (!GetRoute(rb, my_route)) {
+		unordered_map<int, double> accessible;
+		Get_acc(robots[i], accessible);					//找出当前机器人的可达节点，附带距离
+		if (!GetRoute(robots[i], my_route, i, accessible)) {
 			continue;
 		}
 		puton_occ_stat(my_route.start);
 		puton_occ_stat(my_route.end, my_route.object);
 		flush_list();
+
+		vector<int> way = get_way(my_route.start, robots[i]);	//当前机器人到起点的距离以及路线
 		robots[i].cur = my_route;
 		robots[i].on_job = true;
 		robots[i].state = BEFORE;
+		robots[i].before_way = way;
+		robots[i].after_way = my_route.line;
 	}
 }
 
 void Command::RobotColl()
 {
 	double hold_base = M_PI, no_hold_base = M_PI_2;
-	if (map_id == 18) {
-		no_hold_base = M_PI_W;
-		hold_base = M_PI3_2;
-	}
 	unordered_set<int> visit;
 	for (int i = 0; i < robots.size(); ++i) {
 		if (!robots[i].on_coll || visit.find(i) != visit.end()) {
 			continue;
 		}
-#ifdef DEBUG
-		cerr << "机器人" << i << "避障" << endl;
-#endif // DEBUG
-
 
 		double angle, speed, trash;
 		int another = robots_coll_map[i];
@@ -655,15 +482,7 @@ void Command::RobotColl()
 		double base = (cur.state == AFTER ? hold_base : no_hold_base);
 		coll_angle_caculate(target.real_pos, cur.real_pos, target.face, cur.face, angle, base);
 		normal_caculate(cur.object_target, cur.real_pos, cur.face, speed, trash);
-
-#ifdef DEBUG
-		cerr << i << "机器人speed:" << speed << "angle:" << angle << endl;
-#endif // DEBUG
-
 		if (i == robots_coll_map[another]) {
-#ifdef DEBUG
-			cerr << "机器人" << another << "避障k" << endl;
-#endif // DEBUG
 			double d_angle = 0, d_speed = 0;
 			double base = (target.state == AFTER ? hold_base : no_hold_base);
 			coll_angle_caculate(cur.real_pos, target.real_pos, cur.face, target.face, d_angle, base);
@@ -672,60 +491,41 @@ void Command::RobotColl()
 			visit.insert(another);
 			if (angle * d_angle < 0) {
 				angle_s.push_back(make_pair(another, -d_angle));
-#ifdef DEBUG
-				cerr << i << "机器人speed:" << d_speed << "angle:" << -d_angle << endl;
-#endif // DEBUG
 			}
 			else {
 				angle_s.push_back(make_pair(another, d_angle));
-#ifdef DEBUG
-				cerr << i << "机器人speed:" << d_speed << "angle:" << d_angle << endl;
-#endif // DEBUG
 			}
-			if (d_speed < 3 ) {
-				if (map_id == 43 || map_id == 18) {
-					d_speed = speed;
-				}
-				if (!target.on_side) {
-					forward_s.push_back(make_pair(another, d_speed));
-				}
-				else {
-					forward_s.push_back(make_pair(another, min(SIDE_SPEED, d_speed)));
-				}
-			}
+			if (d_speed < 3) {
+				forward_s.push_back(make_pair(another, d_speed));
+			}			
 		}
 		angle_s.push_back(make_pair(i, angle));
 		if (speed < 3) {
-			if (!cur.on_side) {
-				forward_s.push_back(make_pair(i, speed));
-			}
-			else {
-				forward_s.push_back(make_pair(i, min(SIDE_SPEED, speed)));
-			}
-		}
+			forward_s.push_back(make_pair(i, speed));
+		}		
 		visit.insert(i);
 	}
 }
 
-bool Command::GetRoute(const robot& rb, route& ret)
+bool Command::GetRoute(const robot& rb, route& ret, int id, const unordered_map<int, double>& accessible)
 {
 	//	寻找maxValue和maxDistance，方便归一化以及正向化
 	double maxValue = 0, maxDistance = 0, score = 0;
 	for (const auto& cur_route : avaliable) {
-		if (!can_select(cur_route)) {
+		if (!can_select(cur_route, accessible)) {
 			continue;
 		}
-		route_caculate(cur_route, rb, maxValue, maxDistance, score, true);
+		route_caculate(cur_route, rb, accessible, maxValue, maxDistance, score, true, id);
 	}
 
 	for (const auto& cur_route : maybe_avaliable) {
-if (!can_select(cur_route)) {
-	continue;
-}
-if (idToworker[cur_route.start].time <= 0) {
-	continue;
-}
-route_caculate(cur_route, rb, maxValue, maxDistance, score, true);
+		if (!can_select(cur_route, accessible)) {
+			continue;
+		}
+		if (idToworker[cur_route.start].time <= 0) {
+			continue;
+		}
+		route_caculate(cur_route, rb, accessible, maxValue, maxDistance, score, true, id);
 	}
 	//	将归一化和正向化之后的指标加权赋分给路线，然后放进priority_queue
 
@@ -736,23 +536,23 @@ route_caculate(cur_route, rb, maxValue, maxDistance, score, true);
 
 
 	for (const auto& cur_route : avaliable) {
-		if (!can_select(cur_route)) {
+		if (!can_select(cur_route, accessible)) {
 			continue;
 		}
-		if (!route_caculate(cur_route, rb, maxValue, maxDistance, score, false)) {
+		if (!route_caculate(cur_route, rb, accessible, maxValue, maxDistance, score, false, id)) {
 			continue;
 		}
 		pq.push(make_pair(score, cur_route));	//选中的路线给它评分，越小越好，进堆	
 	}
 
 	for (const auto& cur_route : maybe_avaliable) {
-		if (!can_select(cur_route)) {
+		if (!can_select(cur_route, accessible)) {
 			continue;
 		}
 		if (idToworker[cur_route.start].time <= 0) {
 			continue;
 		}
-		if (!route_caculate(cur_route, rb, maxValue, maxDistance, score, false)) {
+		if (!route_caculate(cur_route, rb, accessible, maxValue, maxDistance, score, false , id)) {
 			continue;
 		}
 		pq.push(make_pair(score, cur_route));	//选中的路线给它评分，越小越好，进堆	
@@ -763,30 +563,59 @@ route_caculate(cur_route, rb, maxValue, maxDistance, score, true);
 	}
 
 	ret = pq.top().second;
-	/*worker start = idToworker[ret.start];
-	se_Need[start.style] = min(se_Need[start.style] - 1, 0);
-	if (se_Need[start.style] == 0) {
-		seven_need &= (~(1 << start.style));
-	}*/
-#ifdef DEBUG
-	cerr << "seven_need:" << seven_need << endl;
-#endif // DEBUG
-
-
 	return true;
+}
+
+void Command::caculate_nextWay(robot& rb, bool is_before)
+{
+	vector<int> cur_way;
+	if (is_before) {
+		cur_way = rb.before_way;
+	}
+	else {
+		cur_way = rb.after_way;
+	}
+
+	if (rb.object_target.first != -1 && GetLength(rb.real_pos, rb.object_target) >= 0.4) {
+		return;
+	}
+
+	int index = 0;
+	while (index < cur_way.size()) {
+		pair<double, double> temp_real;
+		int x = cur_way[index] / 100, y = cur_way[index] % 100;
+		mapToreal(make_pair(x, y), temp_real);
+		double temp = GetLength(rb.real_pos, temp_real);
+		if (temp < 0.25) {
+			break;
+		}
+	}
+
+	for (int i = cur_way.size() - 1; i >= index; --i) {
+		if (is_noneObc(cur_way[i], rb)) {
+			int x = cur_way[i] / 100, y = cur_way[i] % 100;
+			mapToreal(make_pair(x, y), rb.object_target);
+			break;
+		}
+	}
 }
 
 void Command::mapToreal(pair<int, int> old, pair<double, double>& ret)
 {
-	ret.first = static_cast<double>(old.first) / 2 + 0.25;
-	ret.second = (static_cast<double>(old.second) / 2 + 0.25);
-
+	int temp_x = old.second;
+	int temp_y = old.first;
+	ret.first = static_cast<double>(temp_x) / 2 + 0.25;
+	ret.second = 49.75 - (static_cast<double>(temp_y) / 2);
+	//0.5 * j + 0.25, 49.75 - 0.5 * i
 }
 
 void Command::realTomap(pair<double, double> old, pair<int, int>& ret)
 {
-	ret.first = (old.first - 0.25) * 2;
-	ret.second = (old.second - 0.25) * 2;
+	double temp_y = old.second;
+	double temp_x = old.first;
+	ret.first = (temp_y - 0.25) * 2;
+	ret.second = (temp_x - 0.25) * 2;
+	ret.first = map.size() - 1 - ret.first;
 }
 
 //	算两个点之间的距离
@@ -843,20 +672,33 @@ void Command::normal_caculate(const pair<double, double>& target, const pair<dou
 	int dir = a_diff > 0 ? 1 : -1;
 	a_diff = abs(a_diff);
 
+	//const double maxRotateSpeed = (dir > 0 ? M_PI : -M_PI);     //角速度拉满
+	//const double maxSpeed = min(distance / 0.0525, 6.);             //哦吼？很有意思的数值markmark
+	//if (a_diff < M_PI_32) { // 如果朝向和目标点的夹角很小，直接全速前进
+	//	speed = 6;
+	//	angle = 0;
+	//}
+	//else {
+	//	if (a_diff > M_PI_2) {
+	//		// 角度太大，全速扭转
+	//		// 速度控制小一点，避免靠近不了工作台
+	//		speed = 6.0 * 0.2;
+	//		angle = maxRotateSpeed;
+	//	}
+	//	else {
+	//		speed = 6. * cos(a_diff); // 前进速度随角度变小而变大
+	//		angle = maxRotateSpeed * sin(a_diff);    // 旋转速度随角度变小而变小
+	//	}
+	//}
+
 	//当机器人和目标地点偏角很大
 	if (a_diff >= M_PI_2) {
-		speed = 0.1;
-		if (distance >= 5) {
-			speed = 3;
-		}
+		speed = -2;
 		angle = M_PI * dir;
 	}
 	//当机器人和目标地点偏角较大
 	else if (a_diff >= M_PI_8) {
 		speed = 1;
-		if (distance >= 7) {
-			speed = 6;
-		}
 		angle = M_PI * dir;
 	}
 	//做微调  
@@ -873,17 +715,6 @@ void Command::normal_caculate(const pair<double, double>& target, const pair<dou
 		speed = 6;
 		angle = 0;
 	}
-
-	if (map_id == 43) {
-		if (target.first <= 1 || target.first >= 49 || target.second <= 1 || target.second >= 49) {
-			if (cur.first <= 2 || cur.first >= 48 || cur.second <= 2 || cur.second >= 48) {
-				return;
-			}
-			if (distance >= 2) {
-				angle -= M_PI_4;
-			}
-		}
-	}
 }
 
 void Command::coll_angle_caculate(const pair<double, double>& target, const pair<double, double>& cur, const double& t_face, const double& c_face, double& angle, double base)
@@ -899,7 +730,7 @@ void Command::coll_angle_caculate(const pair<double, double>& target, const pair
 		a_diff += 2 * M_PI;
 	}
 	int dir = a_diff > 0 ? -1 : 1;
-	
+
 	double face_dif = t_face - c_face;
 	face_dif = abs(face_dif);
 
@@ -908,12 +739,13 @@ void Command::coll_angle_caculate(const pair<double, double>& target, const pair
 	angle = base * dir * (face_dif > M_PI_H ? face_dir : 1);
 }
 
-bool Command::route_caculate(const route& cur_route, const robot& rb, double& maxValue, double& maxDistance, double& score, bool is_first)
+bool Command::route_caculate(const route& cur_route, const robot& rb, const unordered_map<int, double>& accessible, double& maxValue, double& maxDistance, double& score, bool is_first, int id)
 {
 	worker route_start_worker = idToworker[cur_route.start];
+	worker route_end_worker = idToworker[cur_route.end];
 	pair<double, double> cur_worker_pos = route_start_worker.real_pos;
-	double distance = GetLength(rb.real_pos, cur_worker_pos); //	计算机器人到起始点距离
-	if (cur_route.stat == NO_PRODUCT && (lengthOneFrame * route_start_worker.time) > distance) {
+	double distance = accessible.at(cur_route.start);			 //	计算机器人到起始点距离
+	if (cur_route.stat == NO_PRODUCT && (lengthOneFrame * route_start_worker.time) > GetLength(rb.real_pos, route_start_worker.real_pos)) {
 		return false;
 	}
 	distance += cur_route.length;
@@ -933,35 +765,24 @@ bool Command::route_caculate(const route& cur_route, const robot& rb, double& ma
 	return true;
 }
 
-bool Command::can_select(const route& cur)
+bool Command::can_select(const route& cur, const unordered_map<int, double>& accessible)
 {
 	worker route_start_worker = idToworker[cur.start];
 	if (stat == MIDP_OVER && route_start_worker.style <= 3) {
 		return false;
 	}
-	if (seven_need != OBJECT_NULL) {
-		if (stat == MIDP_OVER && (route_start_worker.product_object & seven_need) == 0) {
-			return false;
-		}
+	if (accessible.count(cur.start) == 0) {
+		return false;
 	}
 	return true;
 }
 
 bool Command::closeToside(const robot& cur)
 {
-	int x = cur.real_pos.first, y = cur.real_pos.second;
+	double x = cur.real_pos.first, y = cur.real_pos.second;
 	double timex1 = abs((x - 0.5) / cur.l_speed.first), timex2 = abs((49.5 - x) / cur.l_speed.second);
 	double timey1 = abs((y - 0.5) / cur.l_speed.second), timey2 = abs((49.5 - y) / cur.l_speed.second);
-#ifdef DEBUG
-	cerr << timex1 << " " << timex2 << " " << timey1 << " " << timey2 << endl;
-#endif // DEBUG
 
- 	/*if (x <= 0.5 || x >= 49.5) {
-		return true;
-	}
-	if (y <= 0.5 || y >= 49.5) {
-		return true;
-	}*/
 	if (min(timex1, timex2) <= 0.3) {
 		return true;
 	}
@@ -987,6 +808,158 @@ bool Command::outline_check(const robot& target, const robot& check, double pi)
 	}
 
 	return false;
+}
+
+bool Command::worker_avaliable(int x, int y)
+{
+	int total = 0, conti = 0;
+	int temp = 0;
+	for (int i = 0; i < 4; ++i) {
+		int nx = x + dic[i][0];
+		int ny = y + dic[i][1];
+		++temp;
+		if (nx < 0 || nx >= map.size() || ny < 0 || ny >= map[0].size() || map[nx][ny] == '#') {
+			++total;
+			conti = max(temp, conti);
+		}
+		else {
+			temp = 0;
+		}
+	}
+	switch (total) {
+	case 0:
+	case 1:
+		return true;
+	case 2:
+		if ((int)(map[x][y] - '0') > 3 || conti == 1) {
+			return false;
+		}
+	case 3:
+	case 4:
+		return false;
+	}
+}
+
+bool Command::is_range(int x, int y)
+{
+	if (x >= 0 && x < map.size() && y >= 0 && y < map[0].size()) {
+		return true;
+	}
+	return false;
+}
+
+void Command::Get_acc(const robot& rb, unordered_map<int, double>& accessible)
+{
+	int x, y;
+	get_closePoint(rb, x, y);
+
+	queue<pair<int, int>> qe;
+	qe.push(make_pair(x, y));
+	unordered_set<int> visit;
+	visit.insert(x * 100 + y);
+	int dep = 0;
+	while (!qe.empty()) {
+		int length = qe.size();
+		while (length--) {
+			auto cur = qe.front();
+			qe.pop();
+			for (int i = 0; i < 4; ++i) {
+				int nx = cur.first + dic[i][0];
+				int ny = cur.second + dic[i][1];
+				if (is_range(nx, ny) && map[nx][ny] != '#' && visit.find(nx * 100 + ny) == visit.end()) {
+					if (!test_side(i, cur.first, cur.second)) {
+						continue;
+					}
+					if (style.find(map[nx][ny] - '0') != style.end()) {
+						accessible[nx * 100 + ny] = dep;
+					}
+					visit.insert(nx * 100 + ny);
+					qe.push(make_pair(nx, ny));
+				}
+			}
+		}
+		++dep;
+	}
+}
+
+void Command::get_closePoint(const robot& rb, int& x, int& y)
+{
+	double distance = 1000000;
+	for (int i = 0; i < map.size(); ++i) {
+		for (int j = 0; j < map[0].size(); ++j) {
+			pair<int, int> pos = make_pair(i, j);
+			pair<double, double> real;
+			mapToreal(pos, real);
+			double temp = GetLength(real, rb.real_pos);
+			if (temp < distance) {
+				distance = temp;
+				x = i, y = j;
+			}
+		}
+	}
+}
+
+bool Command::is_noneObc(int id, const robot& rb)
+{
+	int x1 = id / 100, y1 = id % 100;
+	double x2 = rb.real_pos.first, y2 = rb.real_pos.second;
+	pair<double, double> pos;
+	mapToreal(make_pair(x1, y1), pos);
+	double t_x = pos.second - y2;
+	double t_y = pos.first - x2;
+	double theta = atan2(t_x, t_y);
+	double k = tan(theta);
+
+	for (const auto& id : obcTot) {
+		int x = id / 100, y = id % 100;
+		pair<double, double> temp;
+		mapToreal(make_pair(x, y), temp);
+
+		if (!(temp.first <= max(x2, pos.first) + OBCMINDIS && temp.first >= min(x2, pos.first) - OBCMINDIS
+			&& temp.second <= max(y2, pos.second) + OBCMINDIS && temp.second >= min(y2, pos.second) - OBCMINDIS)) {
+			continue;
+		}
+
+		double dis = abs(k * (temp.first - x2) - (temp.second - y2)) / sqrt(k * k + 1);
+		if (dis <= OBCMINDIS) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool Command::test_side(int step, int x, int y)
+{
+	int nx = x + dic[step][0], ny = y + dic[step][1];
+	int count = 0;
+	for (int i = 0; i < 4; ++i) {
+		int kx = nx + dic[i][0];
+		int ky = ny + dic[i][1];
+		if (!is_range(kx, ky) || map[kx][ky] == '#') {
+			++count;
+		}
+	}
+	if (count) {
+		return false;
+	}
+	return true;
+}
+
+vector<int> Command::can_reach(const worker& start, const worker& end, double& distance)
+{
+	distance = 0;
+	return BFS(start.pos, end.pos, distance);
+}
+
+vector<int> Command::get_way(int id, const robot& rb)
+{
+	int x, y;
+	get_closePoint(rb, x, y);
+
+	int t_x = id / 100, t_y = id % 100;
+	double temp;
+	return BFS(make_pair(x, y), make_pair(t_x, t_y), temp);
 }
 
 //	清除avaliable，重置unavaliable
@@ -1174,6 +1147,53 @@ void Command::puton_need_stat(int id, int object) {
 			p->stat |= NO_NEED;
 		}
 	}
+}
+
+vector<int> Command::BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance)
+{
+	queue<tuple<int, int, vector<int>>> qe;
+	bool flag = false;
+	vector<int> ret;
+	vector<int> temp{ start.first * 100 + start.second };
+	unordered_set<int> visit;
+
+	qe.push(make_tuple(start.first, start.second, temp));
+	visit.insert(start.first * 100 + start.second);
+	while (!qe.empty()) {
+		int length = qe.size();
+		while (length--) {
+			auto cur = qe.front();
+			qe.pop();
+			int x = get<0>(cur), y = get<1>(cur);
+			if (x == end.first && y == end.second) {
+				flag = true;
+				ret = move(get<2>(cur));
+				break;
+			}
+			for (int i = 0; i < 4; ++i) {
+				int nx = x + dic[i][0];
+				int ny = y + dic[i][1];
+				if (is_range(nx, ny) && map[nx][ny] != '#' && visit.find(nx * 100 + ny) == visit.end()) {
+					if (!test_side(i, x, y)) {
+						continue;
+					}
+					visit.insert(nx * 100 + ny);
+					vector<int> next = get<2>(cur);
+					next.push_back(nx * 100 + ny);
+					qe.push(make_tuple(nx, ny, next));
+				}
+			}
+		}
+		if (flag) {
+			break;
+		}
+	}
+
+	if (flag) {
+		distance = ret.size();
+		return ret;
+	}
+	return {};
 }
 
 void Command::takeoff_need_stat() {
