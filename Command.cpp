@@ -348,9 +348,13 @@ void Command::UpdateInfo()
 		if (robots[i].state == AFTER && item == 0) {
 			robots[i].state = BEFORE;
 		}
+
+		//预测位置
+		robots[i].n_pos.first = robots[i].l_speed.first * (PREDICT / SECONDTOT);
+		robots[i].n_pos.second = robots[i].l_speed.second * (PREDICT / SECONDTOT);
 	}
 
-	/*for (int i = 0; i < robots.size(); ++i) {
+	for (int i = 0; i < robots.size(); ++i) {
 		double distance = 999;
 		int index = i;
 		for (int j = 0; j < robots.size(); ++j) {
@@ -372,7 +376,7 @@ void Command::UpdateInfo()
 			}
 			robots_coll_map[i] = distance > COLL_RADIUS ? robots_coll_map[i] : index;
 		}
-	}*/
+	}
 
 	takeoff_need_stat();
 	flush_list();
@@ -409,6 +413,7 @@ void Command::RobotDoWork()
 			robots[i].state = NONE;
 			robots[i].can_sell = false;
 			robots[i].on_job = false;
+			robots[i].object_target = make_pair(-1, -1);
 
 			puton_need_stat(rt.cur.end, rt.cur.object);
 		}
@@ -423,13 +428,12 @@ void Command::RobotDoWork()
 		case NONE:
 			continue;
 		}
+#ifdef DEBUG
+		cerr << "机器人" << i << " " << rt.object_target.first << " " << rt.object_target.second << endl;
+#endif // DEBUG
 
 		double speed, angle;
-		normal_caculate(rt.object_target, rt.real_pos, rt.face, speed, angle);
-
-#ifdef DEBUG
-		cerr << "机器人" << i << "目标" << rt.object_target.first << " " << rt.object_target.second << endl;
-#endif // DEBUG
+		normal_caculate(rt, speed, angle);
 
 		angle_s.push_back(make_pair(i, angle));
 		forward_s.push_back(make_pair(i, speed));
@@ -464,6 +468,12 @@ void Command::RobotSelectWork()
 		robots[i].state = BEFORE;
 		robots[i].before_way = way;
 		robots[i].after_way = my_route.line;
+#ifdef DEBUG
+		cerr << "机器人" << i << "选择" << idToworker[my_route.start].real_pos.first << " " << 
+			idToworker[my_route.start].real_pos.second << " " <<idToworker[my_route.end].real_pos.first 
+			<< " " << idToworker[my_route.end].real_pos.second << endl;
+#endif // DEBUG
+
 	}
 }
 
@@ -481,12 +491,12 @@ void Command::RobotColl()
 		robot target = robots[robots_coll_map[i]], cur = robots[i];
 		double base = (cur.state == AFTER ? hold_base : no_hold_base);
 		coll_angle_caculate(target.real_pos, cur.real_pos, target.face, cur.face, angle, base);
-		normal_caculate(cur.object_target, cur.real_pos, cur.face, speed, trash);
+		normal_caculate(cur, speed, trash);
 		if (i == robots_coll_map[another]) {
 			double d_angle = 0, d_speed = 0;
 			double base = (target.state == AFTER ? hold_base : no_hold_base);
 			coll_angle_caculate(cur.real_pos, target.real_pos, cur.face, target.face, d_angle, base);
-			normal_caculate(target.object_target, target.real_pos, target.face, d_speed, trash);
+			normal_caculate(target, d_speed, trash);
 
 			visit.insert(another);
 			if (angle * d_angle < 0) {
@@ -576,22 +586,36 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 		cur_way = rb.after_way;
 	}
 
-	if (rb.object_target.first != -1 && GetLength(rb.real_pos, rb.object_target) >= 0.4) {
+	if (abs(-1 - rb.object_target.first) > 1e-6 && GetLength(rb.real_pos, rb.object_target) >= 0.4) {
+//#ifdef DEBUG
+//		cerr << rb.object_target.first << " " << rb.object_target.second << " " << rb.real_pos.first << " " << rb.real_pos.second << endl;
+//#endif // DEBUG
+
 		return;
 	}
 
-	int index = 0;
-	while (index < cur_way.size()) {
-		pair<double, double> temp_real;
-		int x = cur_way[index] / 100, y = cur_way[index] % 100;
-		mapToreal(make_pair(x, y), temp_real);
-		double temp = GetLength(rb.real_pos, temp_real);
-		if (temp < 0.25) {
-			break;
+	int index = -1;
+	double dis = 9999;
+	for (int i = 0; i < cur_way.size(); ++i) {
+		int x = cur_way[i] / 100, y = cur_way[i] % 100;
+		pair<double, double> dis_temp;
+		mapToreal(make_pair(x, y), dis_temp);
+		double cur_dis = GetLength(dis_temp, rb.real_pos);
+		if (cur_dis < dis) {
+			dis = cur_dis;
+			index = i;
 		}
 	}
+	//应当一个能到达的位置，我愿称为路线回归
+	if (dis >= POSCHARGE) {
+		int x = cur_way[index] / 100, y = cur_way[index] % 100;
+		mapToreal(make_pair(x, y), rb.object_target);
+		return;
+	}
 
-	for (int i = cur_way.size() - 1; i >= index; --i) {
+	int x = cur_way[min(index + 1, (int)cur_way.size() - 1)] / 100, y = cur_way[min(index + 1, (int)cur_way.size() - 1)] % 100;
+	mapToreal(make_pair(x, y), rb.object_target);
+	for (int i = cur_way.size() - 1; i > index; --i) {
 		if (is_noneObc(cur_way[i], rb)) {
 			int x = cur_way[i] / 100, y = cur_way[i] % 100;
 			mapToreal(make_pair(x, y), rb.object_target);
@@ -654,14 +678,14 @@ bool Command::IsOnmyway(const robot& target, const robot& check, double pi)
 	return false;
 }
 
-void Command::normal_caculate(const pair<double, double>& target, const pair<double, double>& cur, const double& face, double& speed, double& angle)
+void Command::normal_caculate(const robot& rt, double& speed, double& angle)
 {
 	//找到了目标
-	double x = target.second - cur.second,
-		y = (target.first - cur.first);
+	double x = rt.object_target.second - rt.real_pos.second,
+		y = (rt.object_target.first - rt.real_pos.first);
 	double target_angle = atan2(x, y);	//	计算目标角度与x正半轴夹角
-	double a_diff = target_angle + (-face);	//	计算目标角度与朝向的差值
-	double distance = GetLength(target, cur);
+	double a_diff = target_angle + (-rt.face);	//	计算目标角度与朝向的差值
+	double distance = GetLength(rt.object_target, rt.real_pos);
 
 	if (a_diff > M_PI) {
 		a_diff -= 2 * M_PI;
@@ -715,6 +739,18 @@ void Command::normal_caculate(const pair<double, double>& target, const pair<dou
 		speed = 6;
 		angle = 0;
 	}
+	
+	double obc_dis = 9999;
+	for (const auto& pos_id : obcTot) {
+		int x = pos_id / 100;
+		int y = pos_id % 100;
+		pair<double, double> obc_temp;
+		mapToreal(make_pair(x, y), obc_temp);
+		obc_dis = min(obc_dis, GetLength(obc_temp, rt.real_pos));
+	}
+	if (obc_dis <= OBCMINDIS) {
+		speed *= 0.2;
+	}
 }
 
 void Command::coll_angle_caculate(const pair<double, double>& target, const pair<double, double>& cur, const double& t_face, const double& c_face, double& angle, double base)
@@ -749,7 +785,7 @@ bool Command::route_caculate(const route& cur_route, const robot& rb, const unor
 		return false;
 	}
 	distance += cur_route.length;
-	if (lastbuyselect * (9000 - frame) < distance) {
+	if (lastbuyselect * (15000 - frame) < distance) {
 		return false;
 	}
 	if (is_first) {

@@ -36,6 +36,8 @@ const double lastbuyselect = 0.10;
 const int LAST_SELL_T = 8000;
 const double OVER = 0.5;
 const double coll_frame = 9;
+const int PREDICT = 15;
+const int SECONDTOT = 50;
 
 const double VALUE_WEIGHT = 0.2;
 const double LENGTH_WEIGHT = 0.8;
@@ -46,6 +48,7 @@ const double COLL_RADIUS = 3.5;
 const double COLL_ANGLE = M_PI_8;
 const double OUTLINE_RADIUS = M_PI_6;
 const double OBCMINDIS = 0.883553390593273762;
+const double POSCHARGE = 0.353553390593273762;
 
 const vector<vector<int>> dic{ {1,0},{0,1},{-1,0},{0,-1} };
 
@@ -102,6 +105,7 @@ struct robot {
 	double coll_angle;					//防碰旋转角
 	pair<double, double> l_speed;		//线速度
 	pair<double, double> real_pos;		//机器人的当前坐标，每一帧读取的时候要改变
+	pair<double, double> n_pos;
 
 	robot() : on_job(false), can_buy(false), can_sell(false),
 		state(NONE), face(0), a_speed(0), l_speed(make_pair(0, 0)),
@@ -157,7 +161,7 @@ class Command
 	double GetLength(const pair<double, double>&, const pair<double, double>&);	//	计算两点长度
 	bool isNear(const pair<double, double>&, const pair<double, double>&, double);
 	bool IsOnmyway(const robot& target, const robot& check, double pi);
-	void normal_caculate(const pair<double, double>& target, const pair<double, double>& cur, const double& face, double& speed, double& angle);
+	void normal_caculate(const robot& rt, double& speed, double& angle);
 	void coll_angle_caculate(const pair<double, double>& target, const pair<double, double>& cur, const double& t_face, const double& c_face, double& angle, double base);
 	bool route_caculate(const route& cur_route, const robot& rb, const unordered_map<int, double>& accessible, double& maxValue, double& distance, double& score, bool is_first, int id);
 	bool can_select(const route& cur, const unordered_map<int, double>&);
