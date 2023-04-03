@@ -89,6 +89,10 @@ void Command::Response()
 {
 	for (const auto& res : response) {
 		cout << res << endl;
+#ifdef DEBUG
+		cerr << res << endl;
+#endif // DEBUG
+
 	}
 	fflush(stdout);
 }
@@ -352,6 +356,7 @@ void Command::UpdateInfo()
 		//预测位置
 		robots[i].n_pos.first = robots[i].l_speed.first * (PREDICT / SECONDTOT);
 		robots[i].n_pos.second = robots[i].l_speed.second * (PREDICT / SECONDTOT);
+		robots[i].r_speed = sqrt(l_speed.first * l_speed.first + l_speed.second * l_speed.second);
 	}
 
 	for (int i = 0; i < robots.size(); ++i) {
@@ -459,7 +464,9 @@ void Command::RobotSelectWork()
 			continue;
 		}
 		puton_occ_stat(my_route.start);
-		puton_occ_stat(my_route.end, my_route.object);
+		if (idToworker[my_route.end].style <= 7) {
+			puton_occ_stat(my_route.end, my_route.object);
+		}
 		flush_list();
 
 		vector<int> way = get_way(my_route.start, robots[i]);	//当前机器人到起点的距离以及路线
@@ -719,6 +726,9 @@ void Command::normal_caculate(const robot& rt, double& speed, double& angle)
 	if (a_diff >= M_PI_2) {
 		speed = -2;
 		angle = M_PI * dir;
+		if (is_same_face(rt)) {
+			angle = 0;
+		}
 	}
 	//当机器人和目标地点偏角较大
 	else if (a_diff >= M_PI_8) {
@@ -740,7 +750,7 @@ void Command::normal_caculate(const robot& rt, double& speed, double& angle)
 		angle = 0;
 	}
 	
-	double obc_dis = 9999;
+	/*double obc_dis = 9999;
 	for (const auto& pos_id : obcTot) {
 		int x = pos_id / 100;
 		int y = pos_id % 100;
@@ -750,7 +760,7 @@ void Command::normal_caculate(const robot& rt, double& speed, double& angle)
 	}
 	if (obc_dis <= OBCMINDIS) {
 		speed *= 0.2;
-	}
+	}*/
 }
 
 void Command::coll_angle_caculate(const pair<double, double>& target, const pair<double, double>& cur, const double& t_face, const double& c_face, double& angle, double base)
@@ -896,6 +906,7 @@ void Command::Get_acc(const robot& rb, unordered_map<int, double>& accessible)
 	int dep = 0;
 	while (!qe.empty()) {
 		int length = qe.size();
+		++dep;
 		while (length--) {
 			auto cur = qe.front();
 			qe.pop();
@@ -914,7 +925,6 @@ void Command::Get_acc(const robot& rb, unordered_map<int, double>& accessible)
 				}
 			}
 		}
-		++dep;
 	}
 }
 
@@ -980,6 +990,32 @@ bool Command::test_side(int step, int x, int y)
 		return false;
 	}
 	return true;
+}
+
+bool Command::is_same_face(const robot& rb)
+{
+	double theta = rb.face;
+	if (theta >= 0 && theta <= M_PI_2) {
+		if (rb.l_speed.first >= 0 && rb.l_speed.second >= 0) {
+			return true;
+		}
+	}
+	else if (theta >= M_PI_2 && theta <= M_PI) {
+		if (rb.l_speed.first <= 0 && rb.l_speed.second >= 0) {
+			return true;
+		}
+	}
+	else if (theta <= 0 && theta >= -M_PI_2) {
+		if (rb.l_speed.first >= 0 && rb.l_speed.second <= 0) {
+			return true;
+		}
+	}
+	else if (theta <= -M_PI_2 && theta >= -M_PI) {
+		if (rb.l_speed.first <= 0 && rb.l_speed.second <= 0) {
+			return true;
+		}
+	}
+	return false;
 }
 
 vector<int> Command::can_reach(const worker& start, const worker& end, double& distance)

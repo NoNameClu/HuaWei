@@ -103,6 +103,7 @@ struct robot {
 	double face;						//朝向
 	double a_speed;						//角速度
 	double coll_angle;					//防碰旋转角
+	double r_speed;						//真实速度
 	pair<double, double> l_speed;		//线速度
 	pair<double, double> real_pos;		//机器人的当前坐标，每一帧读取的时候要改变
 	pair<double, double> n_pos;
@@ -173,6 +174,7 @@ class Command
 	void get_closePoint(const robot& rb, int& x, int& y);
 	bool is_noneObc(int id, const robot& rb);
 	bool test_side(int step, int x, int y);
+	bool is_same_face(const robot& rb);
 	vector<int> can_reach(const worker& start, const worker& end, double& distance);
 	vector<int> get_way(int id, const robot& rb);
 	vector<int> BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance);
