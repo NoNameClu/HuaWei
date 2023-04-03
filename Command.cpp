@@ -559,7 +559,7 @@ bool Command::GetRoute(const robot& rb, route& ret, int id, const unordered_map<
 		if (!route_caculate(cur_route, rb, accessible, maxValue, maxDistance, score, false, id)) {
 			continue;
 		}
-		pq.push(make_pair(score, cur_route));	//选中的路线给它评分，越小越好，进堆	
+		pq.push(make_pair(score, cur_route));	
 	}
 
 	for (const auto& cur_route : maybe_avaliable) {
@@ -613,7 +613,7 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 			index = i;
 		}
 	}
-	//应当一个能到达的位置，我愿称为路线回归
+	// 应当一个能到达的位置，我愿称为路线回归
 	if (dis >= POSCHARGE) {
 		int x = cur_way[index] / 100, y = cur_way[index] % 100;
 		mapToreal(make_pair(x, y), rb.object_target);
@@ -640,6 +640,7 @@ void Command::mapToreal(pair<int, int> old, pair<double, double>& ret)
 	//0.5 * j + 0.25, 49.75 - 0.5 * i
 }
 
+// 坐标回整
 void Command::realTomap(pair<double, double> old, pair<int, int>& ret)
 {
 	double temp_y = old.second;
@@ -655,6 +656,7 @@ double Command::GetLength(const pair<double, double>& lhs, const pair<double, do
 	return sqrt(x * x + y * y);
 }
 
+// 判断两个位置坐标是否小于dis
 bool Command::isNear(const pair<double, double>& lhs, const pair<double, double>& rhs, double dis)
 {
 	if (GetLength(lhs, rhs) <= dis) {
@@ -663,6 +665,7 @@ bool Command::isNear(const pair<double, double>& lhs, const pair<double, double>
 	return false;
 }
 
+// 判断机器人有没有在对方路线内
 bool Command::IsOnmyway(const robot& target, const robot& check, double pi)
 {
 	double x = target.real_pos.second - check.real_pos.second,
@@ -763,6 +766,7 @@ void Command::normal_caculate(const robot& rt, double& speed, double& angle)
 	}*/
 }
 
+// 算辐角差值
 void Command::coll_angle_caculate(const pair<double, double>& target, const pair<double, double>& cur, const double& t_face, const double& c_face, double& angle, double base)
 {
 	double x = target.second - cur.second,
@@ -785,11 +789,12 @@ void Command::coll_angle_caculate(const pair<double, double>& target, const pair
 	angle = base * dir * (face_dif > M_PI_H ? face_dir : 1);
 }
 
+// 计算路线权值函数
 bool Command::route_caculate(const route& cur_route, const robot& rb, const unordered_map<int, double>& accessible, double& maxValue, double& maxDistance, double& score, bool is_first, int id)
 {
 	worker route_start_worker = idToworker[cur_route.start];
 	worker route_end_worker = idToworker[cur_route.end];
-	pair<double, double> cur_worker_pos = route_start_worker.real_pos;
+	//pair<double, double> cur_worker_pos = route_start_worker.real_pos;	没用到这个变量
 	double distance = accessible.at(cur_route.start);			 //	计算机器人到起始点距离
 	if (cur_route.stat == NO_PRODUCT && (lengthOneFrame * route_start_worker.time) > GetLength(rb.real_pos, route_start_worker.real_pos)) {
 		return false;
@@ -806,7 +811,7 @@ bool Command::route_caculate(const route& cur_route, const robot& rb, const unor
 		distance = distance / maxDistance;	//路线越小越好，这是一个极小型指标
 		double temp_value;
 		temp_value = 1 - cur_route.value / maxValue;	// 价值越大越好，这一个极大型指标，需要正向化
-		score = temp_value * VALUE_WEIGHT + distance * LENGTH_WEIGHT;	//	权重都置0.5
+		score = temp_value * VALUE_WEIGHT + distance * LENGTH_WEIGHT;	//	该路线权值
 	}
 	return true;
 }
@@ -823,6 +828,7 @@ bool Command::can_select(const route& cur, const unordered_map<int, double>& acc
 	return true;
 }
 
+// 废函数
 bool Command::closeToside(const robot& cur)
 {
 	double x = cur.real_pos.first, y = cur.real_pos.second;
@@ -838,6 +844,7 @@ bool Command::closeToside(const robot& cur)
 	return false;
 }
 
+// 机器人判定区，优化碰撞躲避
 bool Command::outline_check(const robot& target, const robot& check, double pi)
 {
 	double k1 = tan(check.face + pi);
@@ -856,6 +863,7 @@ bool Command::outline_check(const robot& target, const robot& check, double pi)
 	return false;
 }
 
+// 查工作台是否在角落
 bool Command::worker_avaliable(int x, int y)
 {
 	int total = 0, conti = 0;
@@ -886,6 +894,7 @@ bool Command::worker_avaliable(int x, int y)
 	}
 }
 
+// is_range判断判断点是否在地图内
 bool Command::is_range(int x, int y)
 {
 	if (x >= 0 && x < map.size() && y >= 0 && y < map[0].size()) {
@@ -897,15 +906,15 @@ bool Command::is_range(int x, int y)
 void Command::Get_acc(const robot& rb, unordered_map<int, double>& accessible)
 {
 	int x, y;
-	get_closePoint(rb, x, y);
+	get_closePoint(rb, x, y);	//	找出机器人在哪个区块
 
-	queue<pair<int, int>> qe;
+	queue<pair<int, int>> qe;	//	BFS 找路
 	qe.push(make_pair(x, y));
 	unordered_set<int> visit;
 	visit.insert(x * 100 + y);
 	int dep = 0;
 	while (!qe.empty()) {
-		int length = qe.size();
+		int length = qe.size();	
 		++dep;
 		while (length--) {
 			auto cur = qe.front();
@@ -931,6 +940,10 @@ void Command::Get_acc(const robot& rb, unordered_map<int, double>& accessible)
 void Command::get_closePoint(const robot& rb, int& x, int& y)
 {
 	double distance = 1000000;
+
+	// 感觉这里可以把rb坐标取整优化下，但是边界判断有点麻烦，先不写。
+	//int rb_x = int(rb.real_pos.first);
+	//int rb_y = int(rb.real_pos.second);
 	for (int i = 0; i < map.size(); ++i) {
 		for (int j = 0; j < map[0].size(); ++j) {
 			pair<int, int> pos = make_pair(i, j);
@@ -975,6 +988,7 @@ bool Command::is_noneObc(int id, const robot& rb)
 	return true;
 }
 
+// 判断在不在地图边界或者是否有障碍物
 bool Command::test_side(int step, int x, int y)
 {
 	int nx = x + dic[step][0], ny = y + dic[step][1];
@@ -984,6 +998,7 @@ bool Command::test_side(int step, int x, int y)
 		int ky = ny + dic[i][1];
 		if (!is_range(kx, ky) || map[kx][ky] == '#') {
 			++count;
+			return true;
 		}
 	}
 	if (count) {
