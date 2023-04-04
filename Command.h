@@ -159,6 +159,8 @@ class Command
 
 	void mapToreal(pair<int, int>, pair<double, double>&);						//	坐标转化
 	void realTomap(pair<double, double>, pair<int, int>&);
+	void idTomap(int id, pair<int, int>&);
+	void idToreal(int id, pair<double, double>&);
 	double GetLength(const pair<double, double>&, const pair<double, double>&);	//	计算两点长度
 	bool isNear(const pair<double, double>&, const pair<double, double>&, double);
 	bool IsOnmyway(const robot& target, const robot& check, double pi);
@@ -175,6 +177,7 @@ class Command
 	bool is_noneObc(int id, const robot& rb);
 	bool test_side(int step, int x, int y);
 	bool is_same_face(const robot& rb);
+	bool robots_has_obc(const robot& lhs, const robot& rhs);
 	vector<int> can_reach(const worker& start, const worker& end, double& distance);
 	vector<int> get_way(int id, const robot& rb);
 	vector<int> BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance);

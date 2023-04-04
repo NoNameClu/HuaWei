@@ -367,6 +367,9 @@ void Command::UpdateInfo()
 				continue;
 			}
 			if (IsOnmyway(robots[j], robots[i], COLL_ANGLE)) {
+				if (!robots_has_obc(robots[i], robots[j])) {
+					continue; 
+				}
 				robots[i].on_coll = true;
 				robots[i].coll_count = frame;
 				robots[i].coll_num_hide |= (1 << (j + 1));
@@ -613,7 +616,8 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 			index = i;
 		}
 	}
-	// 应当一个能到达的位置，我愿称为路线回归
+
+	// 应当一个能到达的位置，我愿称为回归路线
 	if (dis >= POSCHARGE) {
 		int x = cur_way[index] / 100, y = cur_way[index] % 100;
 		mapToreal(make_pair(x, y), rb.object_target);
@@ -1030,6 +1034,12 @@ bool Command::is_same_face(const robot& rb)
 			return true;
 		}
 	}
+	return false;
+}
+
+//有障碍物返回true， 没有返回false
+bool Command::robots_has_obc(const robot& lhs, const robot& rhs)
+{
 	return false;
 }
 
