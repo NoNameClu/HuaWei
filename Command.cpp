@@ -811,7 +811,7 @@ bool Command::route_caculate(const route& cur_route, const robot& rb, const unor
 {
 	worker route_start_worker = idToworker[cur_route.start];
 	worker route_end_worker = idToworker[cur_route.end];
-	//pair<double, double> cur_worker_pos = route_start_worker.real_pos;	没用到这个变量
+	pair<double, double> cur_worker_pos = route_start_worker.real_pos;	//没用到这个变量
 	double distance = accessible.at(cur_route.start);			 //	计算机器人到起始点距离
 	if (cur_route.stat == NO_PRODUCT && (lengthOneFrame * route_start_worker.time) > GetLength(rb.real_pos, route_start_worker.real_pos)) {
 		return false;
@@ -1015,7 +1015,6 @@ bool Command::test_side(int step, int x, int y)
 		int ky = ny + dic[i][1];
 		if (!is_range(kx, ky) || map[kx][ky] == '#') {
 			++count;
-			return true;
 		}
 	}
 	if (count) {
