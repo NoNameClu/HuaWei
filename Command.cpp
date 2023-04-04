@@ -635,6 +635,19 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 	}
 }
 
+// 取当前格
+void Command::idTomap(int id, pair<int, int>& res) {
+	int x = id / 100, y = id % 100;
+	res.first = x;
+	res.second = y;
+}
+
+void Command::idToreal(int id, pair<double, double>& res) {
+	pair<int, int> old=make_pair(0,0);
+	Command::idTomap(id, old);
+	Command::mapToreal(old, res);
+}
+
 void Command::mapToreal(pair<int, int> old, pair<double, double>& ret)
 {
 	int temp_x = old.second;
@@ -1037,9 +1050,31 @@ bool Command::is_same_face(const robot& rb)
 	return false;
 }
 
-//有障碍物返回true， 没有返回false
+//有障碍物返回true，没有返回false
 bool Command::robots_has_obc(const robot& lhs, const robot& rhs)
 {
+	double x1 = lhs.real_pos.first, y1 = lhs.real_pos.second;
+	double x2 = rhs.real_pos.first, y2 = rhs.real_pos.second;
+	double distance = GetLength(lhs.real_pos, rhs.real_pos);
+	if (distance > 2 || x1-x2==0) {	//	相距过远返回false
+		return false;
+	}
+	//	求直线
+	double k = (y1 - y2) / (x1 - x2);
+	for (const auto& num : obcTot) {
+		pair<double, double> real;
+		idToreal(num,real);
+		double dis1 = GetLength(real, lhs.real_pos);
+		double dis2 = GetLength(real, rhs.real_pos);
+		if (dis1 > distance || dis2 > distance) {	// 判断障碍物在机器人连线中
+			return false;
+		}
+		double x0 = real.first, y0 = real.second;
+		double dis3 = abs(k * (x0 - x1) - y0 + y1) / (sqrt(k * k + 1));	// 障碍物点到两机器人连线距离
+		if (dis3 < 0.515) {
+			return true;
+		}
+	}
 	return false;
 }
 
