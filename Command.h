@@ -179,6 +179,7 @@ class Command
 	bool is_same_face(const robot& rb);
 	bool robots_has_obc(const robot& lhs, const robot& rhs);
 	bool obc_check(const pair<double, double>& lhs, const pair<double, double>& rhs);
+	void target_slowdown(const robot& rt, double& speed, double& angle);
 	vector<int> can_reach(const worker& start, const worker& end, double& distance);
 	vector<int> get_way(int id, const robot& rb);
 	vector<int> BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance, bool is_before);

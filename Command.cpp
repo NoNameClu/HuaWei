@@ -795,6 +795,8 @@ void Command::normal_caculate(const robot& rt, double& speed, double& angle)
 		speed = 0.1;
 		return;
 	}*/
+
+	target_slowdown(rt, speed, angle);
 	
 	/*double obc_dis = 9999;
 	for (const auto& pos_id : obcTot) {
@@ -1114,6 +1116,11 @@ bool Command::obc_check(const pair<double, double>& lhs, const pair<double, doub
 	//	}
 	//}
 	//return false;
+}
+
+void Command::target_slowdown(const robot& rt, double& speed, double& angle)
+{
+
 }
 
 vector<int> Command::can_reach(const worker& start, const worker& end, double& distance)
