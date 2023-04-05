@@ -48,6 +48,7 @@ const double COLL_RADIUS = 3.5;
 const double COLL_ANGLE = M_PI_8;
 const double OUTLINE_RADIUS = M_PI_6;
 const double OBCMINDIS = 0.883553390593273762;
+const double ROBMINDIS = 1.1;
 const double POSCHARGE = 0.353553390593273762;
 
 const vector<vector<int>> dic{ {1,0},{0,1},{-1,0},{0,-1} };
@@ -95,6 +96,8 @@ struct robot {
 	bool on_side, hold_some;						//边界周围
 	int coll_count;
 	int coll_num_wait, coll_num_hide;	//记录当前正在给谁让路
+	int way_index;						//当前路线的坐标
+	double distanceWindex;				//距离该坐标的距离
 	pair<double, double> object_target;
 	vector<int> before_way, after_way;
 	robot_state state;
@@ -153,6 +156,7 @@ class Command
 	void UpdateInfo();	//叶
 	void RobotDoWork();		//我
 	void RobotSelectWork();	//叶
+	void RobotAvoid(int i);
 	void RobotColl();
 	bool GetRoute(const robot&, route&, int id, const unordered_map<int, double>&);
 	void caculate_nextWay(robot& rb, bool is_before);
@@ -180,6 +184,7 @@ class Command
 	bool robots_has_obc(const robot& lhs, const robot& rhs);
 	bool obc_check(const pair<double, double>& lhs, const pair<double, double>& rhs);
 	void target_slowdown(const robot& rt, double& speed, double& angle);
+	void caculate_robotPos(robot& rb);
 	vector<int> can_reach(const worker& start, const worker& end, double& distance);
 	vector<int> get_way(int id, const robot& rb);
 	vector<int> BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance, bool is_before);

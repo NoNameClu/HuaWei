@@ -19,6 +19,7 @@ void Command::start()
 		UpdateInfo();
 		Add_frame();
 		RobotColl();
+		//RobotAvoid();	//探寻重合路径，对于重合路径进行规划，并更新需要避让的机器人目标坐标
 		RobotDoWork();
 		Add_work();
 		RobotSelectWork();
@@ -436,6 +437,9 @@ void Command::RobotDoWork()
 			}
 		}
 
+		caculate_robotPos(rt);
+		//RobotAvoid(i);
+
 		switch (rt.state) {
 		case BEFORE:
 			caculate_nextWay(rt, true);
@@ -494,6 +498,40 @@ void Command::RobotSelectWork()
 			<< " " << idToworker[my_route.end].real_pos.second << endl;
 #endif // DEBUG
 
+	}
+}
+
+void Command::RobotAvoid(int cur)
+{
+	//首先挨个循环判断，每个机器人一次，若路线长度为1000，复杂度就已经接近极限。
+	//思路确定：
+	//首先判断自己与哪些机器人的路线重合，计算自己是否需要避让。
+	//若需要避让，引导如一个新的函数，这个函数会将优先路径设为障碍，然后本机器人再去bfs寻找路径.
+	//注意，自身周围的9个格子不允许被设置。
+
+	robot& check = robots[cur];
+	vector<int> cur_way;
+	if (check.state == BEFORE) {
+		cur_way = check.before_way;
+	}
+	else {
+		cur_way = check.after_way;
+	}
+
+	for (int i = 0; i < robots.size(); ++i) {
+		if (i == cur) {
+			continue;
+		}
+		const robot& target = robots[i];
+		vector<int> t_way;
+		if (check.state == BEFORE) {
+			t_way = check.before_way;
+		}
+		else {
+			t_way = check.after_way;
+		}
+
+		
 	}
 }
 
@@ -614,7 +652,7 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 		return;
 	}
 
-	int index = -1;
+	/*int index = -1;
 	double dis = 9999;
 	for (int i = 0; i < cur_way.size(); ++i) {
 		int x = cur_way[i] / 100, y = cur_way[i] % 100;
@@ -626,32 +664,26 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 			index = i;
 		}
 	}
+	rb.distanceWindex = dis;*/
 
-#ifdef DEBUG
-	cerr << rb.real_pos.first << " " << rb.real_pos.second << " " << index << " " << dis << endl;
-#endif // DEBUG
-
-
-	// 应当一个能到达的位置，我愿称为回归路线
-	if (dis >= POSCHARGE) {
-		for (; index >= 0; --index) {
-			if (is_noneObc(cur_way[index], rb)) {
-				pair<int, int> temp;
-				idTomap(cur_way[index], temp);
-				mapToreal(temp, rb.object_target);
+	int back_ind = rb.way_index;
+	if (rb.distanceWindex >= POSCHARGE) {
+		// 应当一个能到达的位置，我愿称为回归路线
+		back_ind = cur_way.size() - 1;
+		for (; back_ind >= 0; --back_ind) {
+			if (is_noneObc(cur_way[back_ind], rb)) {
+				idToreal(cur_way[back_ind], rb.object_target);
 				break;
 			}
 		}
-		return;
 	}
-
-	int x = cur_way[min(index + 1, (int)cur_way.size() - 1)] / 100, y = cur_way[min(index + 1, (int)cur_way.size() - 1)] % 100;
-	mapToreal(make_pair(x, y), rb.object_target);
-	for (int i = cur_way.size() - 1; i > index; --i) {
-		if (is_noneObc(cur_way[i], rb)) {
-			int x = cur_way[i] / 100, y = cur_way[i] % 100;
-			mapToreal(make_pair(x, y), rb.object_target);
-			break;
+	else {
+		idToreal(cur_way[back_ind + 1], rb.object_target);
+		for (int i = cur_way.size() - 1; i > back_ind; --i) {
+			if (is_noneObc(cur_way[i], rb)) {
+				idToreal(cur_way[i], rb.object_target);
+				break;
+			}
 		}
 	}
 }
@@ -797,6 +829,11 @@ void Command::normal_caculate(const robot& rt, double& speed, double& angle)
 	}*/
 
 	target_slowdown(rt, speed, angle);
+
+//#ifdef DEBUG
+//	cerr << rt.real_pos.first << " " << rt.real_pos.second << " " << speed << " " << angle << endl;
+//#endif // DEBUG
+
 	
 	/*double obc_dis = 9999;
 	for (const auto& pos_id : obcTot) {
@@ -1120,12 +1157,44 @@ bool Command::obc_check(const pair<double, double>& lhs, const pair<double, doub
 
 void Command::target_slowdown(const robot& rt, double& speed, double& angle)
 {
+	/*pair<double, double> target = rt.object_target;
+	pair<double, double> real_pos = rt.real_pos;
+	double x = GetLength(target, real_pos);
+	double y = 6.0 / (1 + exp((-log(11) * x / 3 + log(11))));
+	int dir = speed >= 0 ? 1 : -1;
+	speed = y * dir;*/
+
 	pair<double, double> target = rt.object_target;
 	pair<double, double> real_pos = rt.real_pos;
 	double x = GetLength(target, real_pos);
 	double y = 4 * (1 - exp(-0.5413 * x)) + 2;
 	int dir = speed >= 0 ? 1 : -1;
-	speed = y*dir;
+	speed = y * dir;
+}
+
+void Command::caculate_robotPos(robot& rb)
+{
+	vector<int> cur_way;
+	if (rb.state == BEFORE) {
+		cur_way = rb.before_way;
+	}
+	else {
+		cur_way = rb.after_way;
+	}
+
+	int index = -1;
+	double dis = 9999;
+	for (int i = 0; i < cur_way.size(); ++i) {
+		pair<double, double> dis_temp;
+		idToreal(cur_way[i], dis_temp);
+		double cur_dis = GetLength(dis_temp, rb.real_pos);
+		if (cur_dis < dis) {
+			dis = cur_dis;
+			index = i;
+		}
+	}
+	rb.way_index = index;
+	rb.distanceWindex = dis;
 }
 
 vector<int> Command::can_reach(const worker& start, const worker& end, double& distance)
