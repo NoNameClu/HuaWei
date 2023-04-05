@@ -1120,7 +1120,11 @@ bool Command::obc_check(const pair<double, double>& lhs, const pair<double, doub
 
 void Command::target_slowdown(const robot& rt, double& speed, double& angle)
 {
-
+	pair<double, double> target = rt.object_target;
+	pair<double, double> real_pos = rt.real_pos;
+	double x = GetLength(target, real_pos);
+	double y = 6.0 / (1 + exp((-log(11) * x / 3 + log(11))));
+	speed = y;
 }
 
 vector<int> Command::can_reach(const worker& start, const worker& end, double& distance)
