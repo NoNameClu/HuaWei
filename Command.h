@@ -98,6 +98,7 @@ struct robot {
 	int coll_num_wait, coll_num_hide;	//记录当前正在给谁让路
 	int way_index;						//当前路线的坐标
 	double distanceWindex;				//距离该坐标的距离
+	double rate;
 	pair<double, double> object_target;
 	vector<int> before_way, after_way;
 	robot_state state;
@@ -185,6 +186,7 @@ class Command
 	bool obc_check(const pair<double, double>& lhs, const pair<double, double>& rhs);
 	void target_slowdown(const robot& rt, double& speed, double& angle);
 	void caculate_robotPos(robot& rb);
+	void GetNewWay(int index, const unordered_set<int>& avoid_wait);
 	vector<int> can_reach(const worker& start, const worker& end, double& distance);
 	vector<int> get_way(int id, const robot& rb);
 	vector<int> BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance, bool is_before);

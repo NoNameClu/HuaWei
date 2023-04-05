@@ -35,10 +35,10 @@ bool Command::ReadUntilOK()
 	while (getline(cin, line)) {
 		if (line[0] == 'O' && line[1] == 'K')
 			return true;
-//
-//#ifdef DEBUG
-//		cerr << line << endl;
-//#endif // DEBUG
+		//
+		//#ifdef DEBUG
+		//		cerr << line << endl;
+		//#endif // DEBUG
 
 
 		buf.push_back(line);
@@ -90,9 +90,9 @@ void Command::Response()
 {
 	for (const auto& res : response) {
 		cout << res << endl;
-//#ifdef DEBUG
-//		cerr << res << endl;
-//#endif // DEBUG
+		//#ifdef DEBUG
+		//		cerr << res << endl;
+		//#endif // DEBUG
 
 	}
 	fflush(stdout);
@@ -369,7 +369,7 @@ void Command::UpdateInfo()
 			}
 			if (IsOnmyway(robots[j], robots[i], COLL_ANGLE)) {
 				if (robots_has_obc(robots[i], robots[j])) {
-					continue; 
+					continue;
 				}
 				robots[i].on_coll = true;
 				robots[i].coll_count = frame;
@@ -393,7 +393,6 @@ void Command::UpdateInfo()
 
 void Command::RobotDoWork()
 {
-	//循环判断哪些robot已经被选择了路线
 	for (int i = 0; i < robots.size(); ++i) {
 		robot& rt = robots[i];
 
@@ -438,7 +437,56 @@ void Command::RobotDoWork()
 		}
 
 		caculate_robotPos(rt);
-		//RobotAvoid(i);
+	}
+
+	//循环判断哪些robot已经被选择了路线
+	for (int i = 0; i < robots.size(); ++i) {
+		robot& rt = robots[i];
+		//
+		//		if (!rt.on_job || rt.on_coll) {
+		//			continue;
+		//		}
+		//
+		//		if (rt.can_buy && rt.state == BEFORE) {	//	能购买（靠近目标工作台）
+		//			string temp = "";
+		//			temp += "buy ";
+		//			temp += to_string(i);
+		//			response.push_back(temp);
+		//
+		//			robots[i].state = AFTER;
+		//			robots[i].can_buy = false;
+		//
+		//			puton_product_stat(rt.cur.start);
+		//		}
+		//
+		//		if (rt.can_sell && rt.state == AFTER) {	//	能出售
+		//			string temp = "";
+		//			temp += "sell ";
+		//			temp += to_string(i);
+		//			response.push_back(temp);
+		//
+		//			robots[i].state = NONE;
+		//			robots[i].can_sell = false;
+		//			robots[i].on_job = false;
+		//			robots[i].object_target = make_pair(-1, -1);
+		//
+		//			worker& end_worker = idToworker[robots[i].cur.end];
+		//#ifdef DEBUG
+		//			cerr << end_worker.time << " " << i << endl;
+		//			cerr << (end_worker.hold_object & robots[i].cur.object) << " " << end_worker.need_object << endl;
+		//#endif // DEBUG
+		//
+		//			puton_need_stat(rt.cur.end, rt.cur.object);
+		//			if ((end_worker.hold_object | robots[i].cur.object) == end_worker.need_object && end_worker.time == -1) {
+		//				end_worker.hold_object = 0;
+		//				takeoff_need_stat();
+		//			}
+		//		}
+		//
+		//		caculate_robotPos(rt);
+		if (!rt.on_job || rt.on_coll) {
+			continue;
+		}
 
 		switch (rt.state) {
 		case BEFORE:
@@ -450,6 +498,9 @@ void Command::RobotDoWork()
 		case NONE:
 			continue;
 		}
+
+		RobotAvoid(i);
+
 #ifdef DEBUG
 		cerr << "机器人" << i << " " << rt.object_target.first << " " << rt.object_target.second << endl;
 #endif // DEBUG
@@ -457,8 +508,14 @@ void Command::RobotDoWork()
 		double speed, angle;
 		normal_caculate(rt, speed, angle);
 
-		angle_s.push_back(make_pair(i, angle));
-		forward_s.push_back(make_pair(i, speed));
+		if (rt.object_target == rt.real_pos) {
+			angle_s.push_back(make_pair(i, 0));
+			forward_s.push_back(make_pair(i, 0));
+		}
+		else {
+			angle_s.push_back(make_pair(i, angle));
+			forward_s.push_back(make_pair(i, speed));
+		}
 	}
 
 	//flush_money_stat();
@@ -493,8 +550,8 @@ void Command::RobotSelectWork()
 		robots[i].before_way = way;
 		robots[i].after_way = my_route.line;
 #ifdef DEBUG
-		cerr << "机器人" << i << "选择" << idToworker[my_route.start].real_pos.first << " " << 
-			idToworker[my_route.start].real_pos.second << " " <<idToworker[my_route.end].real_pos.first 
+		cerr << "机器人" << i << "选择" << idToworker[my_route.start].real_pos.first << " " <<
+			idToworker[my_route.start].real_pos.second << " " << idToworker[my_route.end].real_pos.first
 			<< " " << idToworker[my_route.end].real_pos.second << endl;
 #endif // DEBUG
 
@@ -518,21 +575,51 @@ void Command::RobotAvoid(int cur)
 		cur_way = check.after_way;
 	}
 
+	unordered_set<int> avoid_wait;
 	for (int i = 0; i < robots.size(); ++i) {
-		if (i == cur) {
+		if (i == cur || !robots[i].on_job) {
 			continue;
 		}
 		const robot& target = robots[i];
 		vector<int> t_way;
-		if (check.state == BEFORE) {
-			t_way = check.before_way;
+
+		if (target.state == BEFORE) {
+			t_way = target.before_way;
 		}
 		else {
-			t_way = check.after_way;
+			t_way = target.after_way;
 		}
 
-		
+		bool flag = false;
+		for (int start = check.way_index; start < cur_way.size(); ++start) {
+			pair<double, double> temp_c;
+			idToreal(cur_way[start], temp_c);
+			for (int k = target.way_index; k < t_way.size(); ++k) {
+				pair<double, double> temp_t;
+				idToreal(t_way[k], temp_t);
+				double dis = GetLength(temp_c, temp_t);
+				if (dis <= ROBMINDIS) {
+					flag = true;
+					break;
+				}
+			}
+			if (flag) {
+				break;
+			}
+		}
+		if (flag && (check.way_index == target.way_index ? cur < i : check.way_index < target.way_index)) {
+			avoid_wait.insert(i);
+		}
 	}
+
+#ifdef DEBUG
+	for (const auto& n : avoid_wait) {
+		cerr << n << " ";
+	}
+	cerr << endl;
+#endif // DEBUG
+
+	GetNewWay(cur, avoid_wait);
 }
 
 void Command::RobotColl()
@@ -565,12 +652,12 @@ void Command::RobotColl()
 			}
 			if (d_speed < 3) {
 				forward_s.push_back(make_pair(another, d_speed));
-			}			
+			}
 		}
 		angle_s.push_back(make_pair(i, angle));
 		if (speed < 3) {
 			forward_s.push_back(make_pair(i, speed));
-		}		
+		}
 		visit.insert(i);
 	}
 }
@@ -610,7 +697,7 @@ bool Command::GetRoute(const robot& rb, route& ret, int id, const unordered_map<
 		if (!route_caculate(cur_route, rb, accessible, maxValue, maxDistance, score, false, id)) {
 			continue;
 		}
-		pq.push(make_pair(score, cur_route));	
+		pq.push(make_pair(score, cur_route));
 	}
 
 	for (const auto& cur_route : maybe_avaliable) {
@@ -620,7 +707,7 @@ bool Command::GetRoute(const robot& rb, route& ret, int id, const unordered_map<
 		if (idToworker[cur_route.start].time <= 0) {
 			continue;
 		}
-		if (!route_caculate(cur_route, rb, accessible, maxValue, maxDistance, score, false , id)) {
+		if (!route_caculate(cur_route, rb, accessible, maxValue, maxDistance, score, false, id)) {
 			continue;
 		}
 		pq.push(make_pair(score, cur_route));	//选中的路线给它评分，越小越好，进堆	
@@ -645,9 +732,9 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 	}
 
 	if (abs(-1 - rb.object_target.first) > 1e-6 && GetLength(rb.real_pos, rb.object_target) >= 0.4 && obc_check(rb.real_pos, rb.object_target)) {
-//#ifdef DEBUG
-//		cerr << rb.object_target.first << " " << rb.object_target.second << " " << rb.real_pos.first << " " << rb.real_pos.second << endl;
-//#endif // DEBUG
+		//#ifdef DEBUG
+		//		cerr << rb.object_target.first << " " << rb.object_target.second << " " << rb.real_pos.first << " " << rb.real_pos.second << endl;
+		//#endif // DEBUG
 
 		return;
 	}
@@ -696,7 +783,7 @@ void Command::idTomap(int id, pair<int, int>& res) {
 }
 
 void Command::idToreal(int id, pair<double, double>& res) {
-	pair<int, int> old=make_pair(0,0);
+	pair<int, int> old = make_pair(0, 0);
 	Command::idTomap(id, old);
 	Command::mapToreal(old, res);
 }
@@ -830,22 +917,22 @@ void Command::normal_caculate(const robot& rt, double& speed, double& angle)
 
 	target_slowdown(rt, speed, angle);
 
-//#ifdef DEBUG
-//	cerr << rt.real_pos.first << " " << rt.real_pos.second << " " << speed << " " << angle << endl;
-//#endif // DEBUG
+	//#ifdef DEBUG
+	//	cerr << rt.real_pos.first << " " << rt.real_pos.second << " " << speed << " " << angle << endl;
+	//#endif // DEBUG
 
-	
-	/*double obc_dis = 9999;
-	for (const auto& pos_id : obcTot) {
-		int x = pos_id / 100;
-		int y = pos_id % 100;
-		pair<double, double> obc_temp;
-		mapToreal(make_pair(x, y), obc_temp);
-		obc_dis = min(obc_dis, GetLength(obc_temp, rt.real_pos));
-	}
-	if (obc_dis <= OBCMINDIS) {
-		speed *= 0.2;
-	}*/
+
+		/*double obc_dis = 9999;
+		for (const auto& pos_id : obcTot) {
+			int x = pos_id / 100;
+			int y = pos_id % 100;
+			pair<double, double> obc_temp;
+			mapToreal(make_pair(x, y), obc_temp);
+			obc_dis = min(obc_dis, GetLength(obc_temp, rt.real_pos));
+		}
+		if (obc_dis <= OBCMINDIS) {
+			speed *= 0.2;
+		}*/
 }
 
 // 算辐角差值
@@ -996,7 +1083,7 @@ void Command::Get_acc(const robot& rb, unordered_map<int, double>& accessible)
 	visit.insert(x * 100 + y);
 	int dep = 0;
 	while (!qe.empty()) {
-		int length = qe.size();	
+		int length = qe.size();
 		++dep;
 		while (length--) {
 			auto cur = qe.front();
@@ -1195,6 +1282,38 @@ void Command::caculate_robotPos(robot& rb)
 	}
 	rb.way_index = index;
 	rb.distanceWindex = dis;
+	rb.rate = static_cast<double>(index) / cur_way.size();
+}
+
+void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
+{
+	if (avoid_wait.empty()) {
+		return;
+	}
+	vector<string> copy_map = map;
+
+	//避免重路
+	for (const auto& ind : avoid_wait) {
+		const auto& cur_way = robots[ind].state == BEFORE ? robots[ind].before_way : robots[ind].after_way;
+		for (int start = robots[ind].way_index; start < cur_way.size(); ++start) {
+			pair<int, int> pos;
+			idTomap(cur_way[start], pos);
+			map[pos.first][pos.second] = '#';
+		}
+	}
+
+	int target = (robots[index].state == BEFORE ? robots[index].cur.start : robots[index].cur.end);
+	auto& cur_way = robots[index].state == BEFORE ? robots[index].before_way : robots[index].after_way;
+	auto way = get_way(target, robots[index]);
+	if (way.empty()) {
+		robots[index].object_target = robots[index].real_pos;
+	}
+	else {
+		cur_way = way;
+		caculate_nextWay(robots[index], robots[index].state == BEFORE);
+	}
+
+	map = copy_map;
 }
 
 vector<int> Command::can_reach(const worker& start, const worker& end, double& distance)
