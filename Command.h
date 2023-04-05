@@ -175,12 +175,13 @@ class Command
 	void Get_acc(const robot& rb, unordered_map<int, double>& accessible);
 	void get_closePoint(const robot& rb, int& x, int& y);
 	bool is_noneObc(int id, const robot& rb);
-	bool test_side(int step, int x, int y);
+	bool test_side(int step, int x, int y, bool is_before);
 	bool is_same_face(const robot& rb);
 	bool robots_has_obc(const robot& lhs, const robot& rhs);
+	bool obc_check(const pair<double, double>& lhs, const pair<double, double>& rhs);
 	vector<int> can_reach(const worker& start, const worker& end, double& distance);
 	vector<int> get_way(int id, const robot& rb);
-	vector<int> BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance);
+	vector<int> BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance, bool is_before);
 
 	void Clean_list();
 	void flush_list();

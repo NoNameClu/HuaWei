@@ -34,7 +34,7 @@ bool Command::ReadUntilOK()
 	while (getline(cin, line)) {
 		if (line[0] == 'O' && line[1] == 'K')
 			return true;
-
+//
 //#ifdef DEBUG
 //		cerr << line << endl;
 //#endif // DEBUG
@@ -89,9 +89,9 @@ void Command::Response()
 {
 	for (const auto& res : response) {
 		cout << res << endl;
-#ifdef DEBUG
-		cerr << res << endl;
-#endif // DEBUG
+//#ifdef DEBUG
+//		cerr << res << endl;
+//#endif // DEBUG
 
 	}
 	fflush(stdout);
@@ -367,7 +367,7 @@ void Command::UpdateInfo()
 				continue;
 			}
 			if (IsOnmyway(robots[j], robots[i], COLL_ANGLE)) {
-				if (!robots_has_obc(robots[i], robots[j])) {
+				if (robots_has_obc(robots[i], robots[j])) {
 					continue; 
 				}
 				robots[i].on_coll = true;
@@ -423,7 +423,17 @@ void Command::RobotDoWork()
 			robots[i].on_job = false;
 			robots[i].object_target = make_pair(-1, -1);
 
+			worker& end_worker = idToworker[robots[i].cur.end];
+#ifdef DEBUG
+			cerr << end_worker.time << " " << i << endl;
+			cerr << (end_worker.hold_object & robots[i].cur.object) << " " << end_worker.need_object << endl;
+#endif // DEBUG
+
 			puton_need_stat(rt.cur.end, rt.cur.object);
+			if ((end_worker.hold_object | robots[i].cur.object) == end_worker.need_object && end_worker.time == -1) {
+				end_worker.hold_object = 0;
+				takeoff_need_stat();
+			}
 		}
 
 		switch (rt.state) {
@@ -447,7 +457,7 @@ void Command::RobotDoWork()
 		forward_s.push_back(make_pair(i, speed));
 	}
 
-	flush_money_stat();
+	//flush_money_stat();
 	flush_list();
 }
 
@@ -596,7 +606,7 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 		cur_way = rb.after_way;
 	}
 
-	if (abs(-1 - rb.object_target.first) > 1e-6 && GetLength(rb.real_pos, rb.object_target) >= 0.4) {
+	if (abs(-1 - rb.object_target.first) > 1e-6 && GetLength(rb.real_pos, rb.object_target) >= 0.4 && obc_check(rb.real_pos, rb.object_target)) {
 //#ifdef DEBUG
 //		cerr << rb.object_target.first << " " << rb.object_target.second << " " << rb.real_pos.first << " " << rb.real_pos.second << endl;
 //#endif // DEBUG
@@ -617,10 +627,21 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 		}
 	}
 
+#ifdef DEBUG
+	cerr << rb.real_pos.first << " " << rb.real_pos.second << " " << index << " " << dis << endl;
+#endif // DEBUG
+
+
 	// 应当一个能到达的位置，我愿称为回归路线
 	if (dis >= POSCHARGE) {
-		int x = cur_way[index] / 100, y = cur_way[index] % 100;
-		mapToreal(make_pair(x, y), rb.object_target);
+		for (; index >= 0; --index) {
+			if (is_noneObc(cur_way[index], rb)) {
+				pair<int, int> temp;
+				idTomap(cur_way[index], temp);
+				mapToreal(temp, rb.object_target);
+				break;
+			}
+		}
 		return;
 	}
 
@@ -769,6 +790,11 @@ void Command::normal_caculate(const robot& rt, double& speed, double& angle)
 		speed = 6;
 		angle = 0;
 	}
+
+	/*if (distance < 0.4) {
+		speed = 0.1;
+		return;
+	}*/
 	
 	/*double obc_dis = 9999;
 	for (const auto& pos_id : obcTot) {
@@ -914,7 +940,7 @@ bool Command::worker_avaliable(int x, int y)
 // is_range判断判断点是否在地图内
 bool Command::is_range(int x, int y)
 {
-	if (x >= 0 && x < map.size() && y >= 0 && y < map[0].size()) {
+	if (x >= 1 && x < map.size() - 1 && y >= 1 && y < map[0].size() - 1) {
 		return true;
 	}
 	return false;
@@ -940,7 +966,7 @@ void Command::Get_acc(const robot& rb, unordered_map<int, double>& accessible)
 				int nx = cur.first + dic[i][0];
 				int ny = cur.second + dic[i][1];
 				if (is_range(nx, ny) && map[nx][ny] != '#' && visit.find(nx * 100 + ny) == visit.end()) {
-					if (!test_side(i, cur.first, cur.second)) {
+					if (!test_side(i, cur.first, cur.second, true)) {
 						continue;
 					}
 					if (style.find(map[nx][ny] - '0') != style.end()) {
@@ -975,38 +1001,16 @@ void Command::get_closePoint(const robot& rb, int& x, int& y)
 	}
 }
 
+//有障碍物返回false;
 bool Command::is_noneObc(int id, const robot& rb)
 {
-	int x1 = id / 100, y1 = id % 100;
-	double x2 = rb.real_pos.first, y2 = rb.real_pos.second;
-	pair<double, double> pos;
-	mapToreal(make_pair(x1, y1), pos);
-	double t_x = pos.second - y2;
-	double t_y = pos.first - x2;
-	double theta = atan2(t_x, t_y);
-	double k = tan(theta);
-
-	for (const auto& id : obcTot) {
-		int x = id / 100, y = id % 100;
-		pair<double, double> temp;
-		mapToreal(make_pair(x, y), temp);
-
-		if (!(temp.first <= max(x2, pos.first) + OBCMINDIS && temp.first >= min(x2, pos.first) - OBCMINDIS
-			&& temp.second <= max(y2, pos.second) + OBCMINDIS && temp.second >= min(y2, pos.second) - OBCMINDIS)) {
-			continue;
-		}
-
-		double dis = abs(k * (temp.first - x2) - (temp.second - y2)) / sqrt(k * k + 1);
-		if (dis <= OBCMINDIS) {
-			return false;
-		}
-	}
-
-	return true;
+	pair<double, double> temp;
+	idToreal(id, temp);
+	return obc_check(temp, rb.real_pos);
 }
 
 // 判断在不在地图边界或者是否有障碍物
-bool Command::test_side(int step, int x, int y)
+bool Command::test_side(int step, int x, int y, bool is_before)
 {
 	int nx = x + dic[step][0], ny = y + dic[step][1];
 	int count = 0;
@@ -1017,6 +1021,13 @@ bool Command::test_side(int step, int x, int y)
 			++count;
 		}
 	}
+	/*if (is_before) {
+		int kx = nx + dic[step][0], ky = ny + dic[step][1];
+		if (count <= 1 && (is_range(kx, ky) && map[kx][ky] != '#')) {
+			return true;
+		}
+		return false;
+	}*/
 	if (count) {
 		return false;
 	}
@@ -1052,35 +1063,63 @@ bool Command::is_same_face(const robot& rb)
 //有障碍物返回true，没有返回false
 bool Command::robots_has_obc(const robot& lhs, const robot& rhs)
 {
-	double x1 = lhs.real_pos.first, y1 = lhs.real_pos.second;
-	double x2 = rhs.real_pos.first, y2 = rhs.real_pos.second;
-	double distance = GetLength(lhs.real_pos, rhs.real_pos);
-	if (distance > 2 || x1-x2==0) {	//	相距过远返回false
-		return false;
-	}
-	//	求直线
-	double k = (y1 - y2) / (x1 - x2);
-	for (const auto& num : obcTot) {
-		pair<double, double> real;
-		idToreal(num,real);
-		double dis1 = GetLength(real, lhs.real_pos);
-		double dis2 = GetLength(real, rhs.real_pos);
-		if (dis1 > distance || dis2 > distance) {	// 判断障碍物在机器人连线中
+	return !obc_check(lhs.real_pos, rhs.real_pos);
+}
+
+//有障碍物返回false
+bool Command::obc_check(const pair<double, double>& lhs, const pair<double, double>& rhs)
+{
+	double x1 = lhs.first, y1 = lhs.second;
+	double x2 = rhs.first, y2 = rhs.second;
+	double t_x = y1 - y2;
+	double t_y = x1 - x2;
+	double theta = atan2(t_x, t_y);
+	double k = tan(theta);
+
+	for (const auto& id : obcTot) {
+		int x = id / 100, y = id % 100;
+		pair<double, double> temp;
+		mapToreal(make_pair(x, y), temp);
+
+		if (!(temp.first <= max(x2, x1) + OBCMINDIS && temp.first >= min(x2, x1) - OBCMINDIS
+			&& temp.second <= max(y2, y1) + OBCMINDIS && temp.second >= min(y2, y1) - OBCMINDIS)) {
+			continue;
+		}
+
+		double dis = abs(k * (temp.first - x2) - (temp.second - y2)) / sqrt(k * k + 1);
+		if (dis <= OBCMINDIS) {
 			return false;
 		}
-		double x0 = real.first, y0 = real.second;
-		double dis3 = abs(k * (x0 - x1) - y0 + y1) / (sqrt(k * k + 1));	// 障碍物点到两机器人连线距离
-		if (dis3 < 0.515) {
-			return true;
-		}
 	}
-	return false;
+
+	return true;
+
+	//double x1 = lhs.first, y1 = lhs.second;
+	//double x2 = rhs.first, y2 = rhs.second;
+	//double distance = GetLength(lhs, rhs);
+	//	求直线
+	//double k = (y1 - y2) / (x1 - x2);
+	//for (const auto& num : obcTot) {
+	//	pair<double, double> real;
+	//	idToreal(num, real);
+	//	double dis1 = GetLength(real, lhs);
+	//	double dis2 = GetLength(real, rhs);
+	//	if (dis1 > distance || dis2 > distance) {	// 判断障碍物在机器人连线中
+	//		continue;
+	//	}
+	//	double x0 = real.first, y0 = real.second;
+	//	double dis3 = abs(k * (x0 - x1) - y0 + y1) / (sqrt(k * k + 1));	// 障碍物点到两机器人连线距离
+	//	if (dis3 < OBCMINDIS) {
+	//		return true;
+	//	}
+	//}
+	//return false;
 }
 
 vector<int> Command::can_reach(const worker& start, const worker& end, double& distance)
 {
 	distance = 0;
-	return BFS(start.pos, end.pos, distance);
+	return BFS(start.pos, end.pos, distance, false);
 }
 
 vector<int> Command::get_way(int id, const robot& rb)
@@ -1090,7 +1129,7 @@ vector<int> Command::get_way(int id, const robot& rb)
 
 	int t_x = id / 100, t_y = id % 100;
 	double temp;
-	return BFS(make_pair(x, y), make_pair(t_x, t_y), temp);
+	return BFS(make_pair(x, y), make_pair(t_x, t_y), temp, true);
 }
 
 //	清除avaliable，重置unavaliable
@@ -1280,7 +1319,7 @@ void Command::puton_need_stat(int id, int object) {
 	}
 }
 
-vector<int> Command::BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance)
+vector<int> Command::BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance, bool is_before)
 {
 	queue<tuple<int, int, vector<int>>> qe;
 	bool flag = false;
@@ -1305,7 +1344,7 @@ vector<int> Command::BFS(const pair<int, int>& start, const pair<int, int>& end,
 				int nx = x + dic[i][0];
 				int ny = y + dic[i][1];
 				if (is_range(nx, ny) && map[nx][ny] != '#' && visit.find(nx * 100 + ny) == visit.end()) {
-					if (!test_side(i, x, y)) {
+					if (!test_side(i, x, y, is_before)) {
 						continue;
 					}
 					visit.insert(nx * 100 + ny);
