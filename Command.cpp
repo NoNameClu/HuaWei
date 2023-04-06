@@ -35,10 +35,10 @@ bool Command::ReadUntilOK()
 	while (getline(cin, line)) {
 		if (line[0] == 'O' && line[1] == 'K')
 			return true;
-		//
-		//#ifdef DEBUG
-		//		cerr << line << endl;
-		//#endif // DEBUG
+
+		#ifdef DEBUG
+				cerr << line << endl;
+		#endif // DEBUG
 
 
 		buf.push_back(line);
@@ -211,6 +211,9 @@ void Command::initMap()
 			if ((start.product_object & end.need_object) == 0) {	//	前面生产的是后面需要的，此路线才有效
 				continue;
 			}
+			/*if (end.style > 7 && start.style < 7) {
+				continue;
+			}*/
 			double distance = 0;					//工作台之间的距离
 			vector<int> way = can_reach(start, end, distance);		//start节点可以碰到end节点就可以继续（BFS）
 			if (way.empty()) {
@@ -358,6 +361,9 @@ void Command::UpdateInfo()
 		robots[i].n_pos.first = robots[i].l_speed.first * (PREDICT / SECONDTOT);
 		robots[i].n_pos.second = robots[i].l_speed.second * (PREDICT / SECONDTOT);
 		robots[i].r_speed = sqrt(l_speed.first * l_speed.first + l_speed.second * l_speed.second);
+
+		robots[i].on_avoid = false;
+		robots[i].avoid_index = 9999;
 	}
 
 	for (int i = 0; i < robots.size(); ++i) {
@@ -499,7 +505,7 @@ void Command::RobotDoWork()
 			continue;
 		}
 
-		RobotAvoid(i);
+		//RobotAvoid(i);
 
 #ifdef DEBUG
 		cerr << "机器人" << i << " " << rt.object_target.first << " " << rt.object_target.second << endl;
@@ -567,13 +573,6 @@ void Command::RobotAvoid(int cur)
 	//注意，自身周围的9个格子不允许被设置。
 
 	robot& check = robots[cur];
-	vector<int> cur_way;
-	if (check.state == BEFORE) {
-		cur_way = check.before_way;
-	}
-	else {
-		cur_way = check.after_way;
-	}
 
 	unordered_set<int> avoid_wait;
 	for (int i = 0; i < robots.size(); ++i) {
@@ -581,33 +580,9 @@ void Command::RobotAvoid(int cur)
 			continue;
 		}
 		const robot& target = robots[i];
-		vector<int> t_way;
 
-		if (target.state == BEFORE) {
-			t_way = target.before_way;
-		}
-		else {
-			t_way = target.after_way;
-		}
-
-		bool flag = false;
-		for (int start = check.way_index; start < cur_way.size(); ++start) {
-			pair<double, double> temp_c;
-			idToreal(cur_way[start], temp_c);
-			for (int k = target.way_index; k < t_way.size(); ++k) {
-				pair<double, double> temp_t;
-				idToreal(t_way[k], temp_t);
-				double dis = GetLength(temp_c, temp_t);
-				if (dis <= ROBMINDIS) {
-					flag = true;
-					break;
-				}
-			}
-			if (flag) {
-				break;
-			}
-		}
-		if (flag && (check.way_index == target.way_index ? cur < i : check.way_index < target.way_index)) {
+		bool flag = check_avoid(check, target);
+		if (flag && (check.rate == target.rate ? cur < i : check.rate < target.rate)) {
 			avoid_wait.insert(i);
 		}
 	}
@@ -723,14 +698,9 @@ bool Command::GetRoute(const robot& rb, route& ret, int id, const unordered_map<
 
 void Command::caculate_nextWay(robot& rb, bool is_before)
 {
-	vector<int> cur_way;
-	if (is_before) {
-		cur_way = rb.before_way;
-	}
-	else {
-		cur_way = rb.after_way;
-	}
+	const vector<int>& cur_way = rb.state == BEFORE ? rb.before_way : rb.after_way;
 
+	//若能前往当前的目标地点或者没有到达目标地点
 	if (abs(-1 - rb.object_target.first) > 1e-6 && GetLength(rb.real_pos, rb.object_target) >= 0.4 && obc_check(rb.real_pos, rb.object_target)) {
 		//#ifdef DEBUG
 		//		cerr << rb.object_target.first << " " << rb.object_target.second << " " << rb.real_pos.first << " " << rb.real_pos.second << endl;
@@ -1066,7 +1036,7 @@ bool Command::worker_avaliable(int x, int y)
 // is_range判断判断点是否在地图内
 bool Command::is_range(int x, int y)
 {
-	if (x >= 1 && x < map.size() - 1 && y >= 1 && y < map[0].size() - 1) {
+	if (x >= 0 && x < map.size() && y >= 0 && y < map[0].size()) {
 		return true;
 	}
 	return false;
@@ -1298,7 +1268,9 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 		for (int start = robots[ind].way_index; start < cur_way.size(); ++start) {
 			pair<int, int> pos;
 			idTomap(cur_way[start], pos);
-			map[pos.first][pos.second] = '#';
+			if (!worker_exist(pos)) {
+				map[pos.first][pos.second] = '#';
+			}
 		}
 	}
 
@@ -1306,14 +1278,52 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 	auto& cur_way = robots[index].state == BEFORE ? robots[index].before_way : robots[index].after_way;
 	auto way = get_way(target, robots[index]);
 	if (way.empty()) {
+		robots[index].on_avoid = true;
 		robots[index].object_target = robots[index].real_pos;
 	}
 	else {
-		cur_way = way;
+		cur_way = way;    
+		robots[index].way_index = 0;
 		caculate_nextWay(robots[index], robots[index].state == BEFORE);
 	}
 
 	map = copy_map;
+}
+
+//检查周围八格，有工作台返回true，没有返回false
+bool Command::worker_exist(const pair<int, int>& cur)
+{
+	for (int i = 0; i < eight.size(); ++i) {
+		int nx = cur.first + eight[i][0];
+		int ny = cur.first + eight[i][1];
+		if (is_range(nx, ny) && isdigit(map[nx][ny])) {
+			return true;
+		}
+	}
+	return false;
+}
+
+//路线有交叉返回true，否则返回false
+bool Command::check_avoid(robot& check, const robot& target)
+{
+	const vector<int>& cur_way = check.state == BEFORE ? check.before_way : check.after_way;
+	const vector<int>& t_way = target.state == BEFORE ? check.before_way : check.after_way;
+	
+	int lhs = check.way_index, rhs = target.way_index;
+
+	for (int i = lhs; i < cur_way.size(); ++i) {
+		for (int j = rhs; j < t_way.size(); ++j) {
+			pair<double, double> templ, tempr;
+			idToreal(cur_way[i], templ);
+			idToreal(t_way[i], tempr);
+			if (GetLength(templ, tempr) <= ROBMINDIS) {
+				check.avoid_index = min(check.avoid_index, i);
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 vector<int> Command::can_reach(const worker& start, const worker& end, double& distance)

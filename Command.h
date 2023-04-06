@@ -52,6 +52,7 @@ const double ROBMINDIS = 1.1;
 const double POSCHARGE = 0.353553390593273762;
 
 const vector<vector<int>> dic{ {1,0},{0,1},{-1,0},{0,-1} };
+const vector<vector<int>> eight{ {1,0},{0,1},{-1,0},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1}/*,{2,0},{2,1},{2,2},{2,-1},{2,-2}, {-2,1},{-2,2},{-2,0},{-2,-1},{-2,-2},{-1,-2},{0,-2},{1,-2},{1,2},{0,2},{-1,2}*/ };
 
 enum robot_state {
 	//添加none状态，表示现在没有分配工作
@@ -94,9 +95,11 @@ struct robot {
 	bool can_buy, can_sell;
 	bool on_coll;						//正在躲避碰撞
 	bool on_side, hold_some;						//边界周围
+	bool on_avoid;						//路线规避
 	int coll_count;
 	int coll_num_wait, coll_num_hide;	//记录当前正在给谁让路
 	int way_index;						//当前路线的坐标
+	int avoid_index;					//避免路线坐标
 	double distanceWindex;				//距离该坐标的距离
 	double rate;
 	pair<double, double> object_target;
@@ -187,6 +190,8 @@ class Command
 	void target_slowdown(const robot& rt, double& speed, double& angle);
 	void caculate_robotPos(robot& rb);
 	void GetNewWay(int index, const unordered_set<int>& avoid_wait);
+	bool worker_exist(const pair<int, int>& cur);
+	bool check_avoid(robot& check, const robot& target);
 	vector<int> can_reach(const worker& start, const worker& end, double& distance);
 	vector<int> get_way(int id, const robot& rb);
 	vector<int> BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance, bool is_before);
