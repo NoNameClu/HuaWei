@@ -193,7 +193,7 @@ void Command::initMap()
 		}
 	}
 #ifdef DEBUG
-	cerr << "工作台数量" << idToworker.size();
+	cerr << "工作台数量" << idToworker.size() << endl;
 #endif // DEBUG
 
 
@@ -508,13 +508,14 @@ void Command::RobotDoWork()
 		//RobotAvoid(i);
 
 #ifdef DEBUG
-		cerr << "机器人" << i << " " << rt.object_target.first << " " << rt.object_target.second << endl;
+		cerr << "机器人" << i << " " << rt.object_target.first << " " << rt.object_target.second << " "<< rt.face << endl;
 #endif // DEBUG
 
 		double speed, angle;
 		normal_caculate(rt, speed, angle);
 
-		if (rt.object_target == rt.real_pos) {
+		if (GetLength(rt.object_target,rt.real_pos)<0.1) {	//	感觉这边算浮点数要改一下，固定到那个位置有点难
+		//if (rt.object_target == rt.real_pos) {
 			angle_s.push_back(make_pair(i, 0));
 			forward_s.push_back(make_pair(i, 0));
 		}
@@ -701,7 +702,8 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 	const vector<int>& cur_way = rb.state == BEFORE ? rb.before_way : rb.after_way;
 
 	//若能前往当前的目标地点或者没有到达目标地点
-	if (abs(-1 - rb.object_target.first) > 1e-6 && GetLength(rb.real_pos, rb.object_target) >= 0.4 && obc_check(rb.real_pos, rb.object_target)) {
+	//感觉这里abs(-1 - rb.object_target.first) > 1e-6	这个条件是不是恒成立？？
+	if ( GetLength(rb.real_pos, rb.object_target) >= 0.4 && obc_check(rb.real_pos, rb.object_target)) {
 		//#ifdef DEBUG
 		//		cerr << rb.object_target.first << " " << rb.object_target.second << " " << rb.real_pos.first << " " << rb.real_pos.second << endl;
 		//#endif // DEBUG
@@ -1267,9 +1269,15 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 		const auto& cur_way = robots[ind].state == BEFORE ? robots[ind].before_way : robots[ind].after_way;
 		for (int start = robots[ind].way_index; start < cur_way.size(); ++start) {
 			pair<int, int> pos;
+			pair<double, double> p1, p2;	// p1是前一个位置
+			p1 = p2;
+			idToreal(start, p2);
 			idTomap(cur_way[start], pos);
 			if (!worker_exist(pos)) {
 				map[pos.first][pos.second] = '#';
+			}
+			if (!obc_check(p2, robots[ind].real_pos)) {
+				robots[ind].object_target = p1;	// 从当前位置向路线终点检索，到第一个途中有障碍物的，将前一个设为obj_target
 			}
 		}
 	}
@@ -1279,7 +1287,7 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 	auto way = get_way(target, robots[index]);
 	if (way.empty()) {
 		robots[index].on_avoid = true;
-		robots[index].object_target = robots[index].real_pos;
+		//robots[index].object_target = robots[index].real_pos;	// 为什么这里要这么写？？
 	}
 	else {
 		cur_way = way;    

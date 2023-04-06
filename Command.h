@@ -144,7 +144,7 @@ class Command
 	vector<int> robots_coll_map;								//机器人和对应阻挡的机器人映射
 	unordered_map<int, worker> idToworker;						//id，到worker的索引，12,13,1213。 45.75 49.25   (x - 0.25) / 0.5
 	vector<pair<int, double>> forward_s, angle_s;				//缓冲区
-	vector<string> map;
+	vector<string> map;		//	这个map是？？
 	vector<int> obcTot;											//保存所有障碍物坐标
 
 	const static unordered_set<int> style;	//添加这个常量，主要用在读地图操作的时候
