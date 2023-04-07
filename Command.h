@@ -35,9 +35,11 @@ const double lengthOneFrame = 0.15;
 const double lastbuyselect = 0.10;
 const int LAST_SELL_T = 8000;
 const double OVER = 0.5;
-const double coll_frame = 9;
+const double coll_frame = 3;
 const int PREDICT = 15;
 const int SECONDTOT = 50;
+const int CHECK_WINDOW = 10;
+const int BACK_WINDOW = 5;
 
 const double VALUE_WEIGHT = 0.2;
 const double LENGTH_WEIGHT = 0.8;
@@ -52,7 +54,7 @@ const double ROBMINDIS = 1.1;
 const double POSCHARGE = 0.353553390593273762;
 
 const vector<vector<int>> dic{ {1,0},{0,1},{-1,0},{0,-1} };
-const vector<vector<int>> eight{ {1,0},{0,1},{-1,0},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1}/*,{2,0},{2,1},{2,2},{2,-1},{2,-2}, {-2,1},{-2,2},{-2,0},{-2,-1},{-2,-2},{-1,-2},{0,-2},{1,-2},{1,2},{0,2},{-1,2}*/ };
+const vector<vector<int>> eight{ {1,0},{0,1},{-1,0},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1},{0,0} };
 
 enum robot_state {
 	//添加none状态，表示现在没有分配工作
@@ -144,7 +146,7 @@ class Command
 	vector<int> robots_coll_map;								//机器人和对应阻挡的机器人映射
 	unordered_map<int, worker> idToworker;						//id，到worker的索引，12,13,1213。 45.75 49.25   (x - 0.25) / 0.5
 	vector<pair<int, double>> forward_s, angle_s;				//缓冲区
-	vector<string> map;		//	这个map是？？
+	vector<string> map;
 	vector<int> obcTot;											//保存所有障碍物坐标
 
 	const static unordered_set<int> style;	//添加这个常量，主要用在读地图操作的时候
@@ -192,6 +194,7 @@ class Command
 	void GetNewWay(int index, const unordered_set<int>& avoid_wait);
 	bool worker_exist(const pair<int, int>& cur);
 	bool check_avoid(robot& check, const robot& target);
+	bool decideAvoid(int check, int target);
 	vector<int> can_reach(const worker& start, const worker& end, double& distance);
 	vector<int> get_way(int id, const robot& rb);
 	vector<int> BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance, bool is_before);
