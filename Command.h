@@ -104,7 +104,9 @@ struct robot {
 	int avoid_index;					//避免路线坐标
 	double distanceWindex;				//距离该坐标的距离
 	double rate;
+	double route_face;					//路线方向
 	pair<double, double> object_target;
+	//改声明
 	vector<int> before_way, after_way;
 	robot_state state;
 	route cur;
@@ -195,6 +197,7 @@ class Command
 	bool worker_exist(const pair<int, int>& cur);
 	bool check_avoid(robot& check, const robot& target);
 	bool decideAvoid(int check, int target);
+	double caculate_radius(const pair<double, double>& lhs, const pair<double, double>& rhs);
 	vector<int> can_reach(const worker& start, const worker& end, double& distance);
 	vector<int> get_way(int id, const robot& rb);
 	vector<int> BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance, bool is_before);

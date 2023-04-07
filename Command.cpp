@@ -215,7 +215,9 @@ void Command::initMap()
 				continue;
 			}*/
 			double distance = 0;					//工作台之间的距离
+			//改成double，double
 			vector<int> way = can_reach(start, end, distance);		//start节点可以碰到end节点就可以继续（BFS）
+			//
 			if (way.empty()) {
 				continue;
 			}
@@ -366,7 +368,7 @@ void Command::UpdateInfo()
 		robots[i].avoid_index = 9999;
 	}
 
-	/*for (int i = 0; i < robots.size(); ++i) {
+	for (int i = 0; i < robots.size(); ++i) {
 		double distance = 999;
 		int index = i;
 		for (int j = 0; j < robots.size(); ++j) {
@@ -391,7 +393,7 @@ void Command::UpdateInfo()
 			}
 			robots_coll_map[i] = distance > COLL_RADIUS ? robots_coll_map[i] : index;
 		}
-	}*/
+	}
 
 	takeoff_need_stat();
 	flush_list();
@@ -427,7 +429,7 @@ void Command::RobotDoWork()
 			robots[i].state = NONE;
 			robots[i].can_sell = false;
 			robots[i].on_job = false;
-			robots[i].object_target = make_pair(-1, -1);
+			robots[i].object_target = make_pair(-1, -1);		//卖掉物品后初始化目标地点
 
 			worker& end_worker = idToworker[robots[i].cur.end];
 //#ifdef DEBUG
@@ -579,7 +581,7 @@ void Command::RobotAvoid(int cur)
 		//判断窗口
 		bool flag = check_avoid(check, target);
 		//决定是否避让
-		if (flag && decideAvoid(cur, i)) {
+		if (flag && abs(check.route_face - target.route_face) >= M_PI_2 && decideAvoid(cur, i)) {
 			avoid_wait.insert(i);
 		}
 	}
@@ -695,16 +697,16 @@ bool Command::GetRoute(const robot& rb, route& ret, int id, const unordered_map<
 
 void Command::caculate_nextWay(robot& rb, bool is_before)
 {
-	const vector<int>& cur_way = rb.state == BEFORE ? rb.before_way : rb.after_way;
+	const auto& cur_way = rb.state == BEFORE ? rb.before_way : rb.after_way;
 
-	//若能前往当前的目标地点或者没有到达目标地点
-	if (abs(-1 - rb.object_target.first) > 1e-6 && GetLength(rb.real_pos, rb.object_target) >= 0.4 && obc_check(rb.real_pos, rb.object_target)) {
-		//#ifdef DEBUG
-		//		cerr << rb.object_target.first << " " << rb.object_target.second << " " << rb.real_pos.first << " " << rb.real_pos.second << endl;
-		//#endif // DEBUG
-
-		return;
-	}
+	////若能前往当前的目标地点或者没有到达目标地点
+	//if (abs(-1 - rb.object_target.first) > 1e-6 && GetLength(rb.real_pos, rb.object_target) >= 0.4 && obc_check(rb.real_pos, rb.object_target)) {
+	//	#ifdef DEBUG
+	//			cerr << rb.object_target.first << " " << rb.object_target.second << " " << rb.real_pos.first << " " << rb.real_pos.second << endl;
+	//	#endif // DEBUG
+	//
+	//	return;
+	//}
 
 	/*int index = -1;
 	double dis = 9999;
@@ -721,12 +723,23 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 	rb.distanceWindex = dis;*/
 
 	int back_ind = rb.way_index;
+	/*idToreal(cur_way[back_ind + 1], rb.object_target);
+	for (int i = cur_way.size() - 1; i > 0; --i) {
+		if (is_noneObc(cur_way[i], rb)) {
+			idToreal(cur_way[i], rb.object_target);
+			break;
+		}
+	}*/
+
 	if (rb.distanceWindex >= POSCHARGE) {
 		// 应当一个能到达的位置，我愿称为回归路线
 		back_ind = cur_way.size() - 1;
 		for (; back_ind >= 0; --back_ind) {
 			if (is_noneObc(cur_way[back_ind], rb)) {
 				idToreal(cur_way[back_ind], rb.object_target);
+				pair<double, double> temp;
+				idToreal(cur_way[back_ind], temp);
+				rb.route_face = caculate_radius(temp, rb.real_pos);
 				break;
 			}
 		}
@@ -736,6 +749,9 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 		for (int i = cur_way.size() - 1; i > back_ind; --i) {
 			if (is_noneObc(cur_way[i], rb)) {
 				idToreal(cur_way[i], rb.object_target);
+				pair<double, double> temp;
+				idToreal(cur_way[i], temp);
+				rb.route_face = caculate_radius(temp, rb.real_pos);
 				break;
 			}
 		}
@@ -1104,6 +1120,7 @@ bool Command::is_noneObc(int id, const robot& rb)
 }
 
 // 判断在不在地图边界或者是否有障碍物
+// 有障碍物返回false，无返回true，没拿物品的话可以允许有一个障碍物
 bool Command::test_side(int step, int x, int y, bool is_before)
 {
 	int nx = x + dic[step][0], ny = y + dic[step][1];
@@ -1186,6 +1203,25 @@ bool Command::obc_check(const pair<double, double>& lhs, const pair<double, doub
 		}
 	}
 
+	//判断路径是否有机器人
+	for (int i = 0; i < robots.size(); ++i) {
+		auto temp = robots[i].real_pos;
+		//忽略自身
+		if (GetLength(temp, lhs) <= 0.3 || GetLength(temp, rhs) <= 0.3) {
+			continue;
+		}
+
+		if (!(temp.first <= max(x2, x1) + ROBMINDIS && temp.first >= min(x2, x1) - ROBMINDIS
+			&& temp.second <= max(y2, y1) + ROBMINDIS && temp.second >= min(y2, y1) - ROBMINDIS)) {
+			continue;
+		}
+
+		double dis = abs(k * (temp.first - x2) - (temp.second - y2)) / sqrt(k * k + 1);
+		if (dis <= ROBMINDIS) {
+			return false;
+		}
+	}
+
 	return true;
 
 	//double x1 = lhs.first, y1 = lhs.second;
@@ -1229,13 +1265,7 @@ void Command::target_slowdown(const robot& rt, double& speed, double& angle)
 
 void Command::caculate_robotPos(robot& rb)
 {
-	vector<int> cur_way;
-	if (rb.state == BEFORE) {
-		cur_way = rb.before_way;
-	}
-	else {
-		cur_way = rb.after_way;
-	}
+	const auto& cur_way = rb.state == BEFORE ? rb.before_way : rb.after_way;
 
 	int index = -1;
 	double dis = 9999;
@@ -1272,11 +1302,11 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 		}
 	}
 
-#ifdef DEBUG
-	for (const auto& line : map) {
-		cerr << line << endl;
-	}
-#endif // DEBUG
+//#ifdef DEBUG
+//	for (const auto& line : map) {
+//		cerr << line << endl;
+//	}
+//#endif // DEBUG
 
 
 	int target = (robots[index].state == BEFORE ? robots[index].cur.start : robots[index].cur.end);
@@ -1288,6 +1318,7 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 		cerr << "回退" << endl;
 #endif // DEBUG
 
+		//这里是重点
 		int target_step = robots[index].way_index - BACK_WINDOW;
 		target_step = max(target_step, 0);
 		if (robots[index].way_index == 0) {
@@ -1296,6 +1327,7 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 			return;
 		}
 		idToreal(cur_way[robots[index].way_index], robots[index].object_target);
+
 		for (target_step; target_step > robots[index].way_index; --target_step) {
 			if (is_noneObc(cur_way[target_step], robots[index])) {
 				idToreal(cur_way[target_step], robots[index].object_target);
@@ -1333,23 +1365,32 @@ bool Command::worker_exist(const pair<int, int>& cur)
 //路线有交叉返回true，否则返回false
 bool Command::check_avoid(robot& check, const robot& target)
 {
-	const vector<int>& cur_way = check.state == BEFORE ? check.before_way : check.after_way;
-	const vector<int>& t_way = target.state == BEFORE ? target.before_way : target.after_way;
+	const auto& cur_way = check.state == BEFORE ? check.before_way : check.after_way;
+	const auto& t_way = target.state == BEFORE ? target.before_way : target.after_way;
 
 	int lhs = check.way_index, rhs = target.way_index;
 
-	for (int i = lhs; i < min((int)cur_way.size(), lhs + CHECK_WINDOW); ++i) {
-		for (int j = rhs; j < min((int)t_way.size(), rhs + CHECK_WINDOW); ++j) {
-			pair<double, double> templ, tempr;
+	for (int i = lhs + 1; i < min((int)cur_way.size(), lhs + CHECK_WINDOW); ++i) {
+		for (int j = rhs + 1; j < min((int)t_way.size(), rhs + CHECK_WINDOW); ++j) {
+			pair<double, double> templ, tempr, tempkl, tempkr;
 			idToreal(cur_way[i], templ);
 			idToreal(t_way[j], tempr);
-			if (GetLength(templ, tempr) <= ROBMINDIS) {
-				check.avoid_index = min(check.avoid_index, i);
+			/*idToreal(cur_way[i - 1], tempkl);
+			idToreal(t_way[j - 1], tempkr);
+
+			double k_lhs = caculate_radius(templ, tempkl), k_rhs = caculate_radius(tempr, tempkr);*/
+
+//#ifdef DEBUG
+//			cerr << k_lhs << " " << k_rhs << " ";
+//#endif // DEBUG
+
+			
+			if (GetLength(templ, tempr) <= ROBMINDIS /*&& abs(k_lhs - k_rhs) >= M_PI_2*/) {
+				//check.avoid_index = min(check.avoid_index, i);
 				return true;
 			}
 		}
 	}
-
 	return false;
 }
 
@@ -1360,12 +1401,26 @@ bool Command::decideAvoid(int check, int target)
 	return c.rate == t.rate ? check < target : c.rate < t.rate;
 }
 
+//从start指向target的线，关于水平角的弧度
+double Command::caculate_radius(const pair<double, double>& target, const pair<double, double>& start)
+{
+	double x1 = target.first, y1 = target.second;
+	double x2 = start.first, y2 = start.second;
+	double t_x = y1 - y2;
+	double t_y = x1 - x2;
+	return atan2(t_x, t_y);
+}
+
 vector<int> Command::can_reach(const worker& start, const worker& end, double& distance)
 {
 	distance = 0;
+
+	//这里先将数组保存下来
+	//将int型下标转化为pair
 	return BFS(start.pos, end.pos, distance, false);
 }
 
+//返回值改成pair
 vector<int> Command::get_way(int id, const robot& rb)
 {
 	int x, y;
