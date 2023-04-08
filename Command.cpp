@@ -364,7 +364,6 @@ void Command::UpdateInfo()
 		robots[i].n_pos.second = robots[i].l_speed.second * (PREDICT / SECONDTOT);
 		robots[i].r_speed = sqrt(l_speed.first * l_speed.first + l_speed.second * l_speed.second);
 
-		robots[i].on_avoid = false;
 		robots[i].avoid_index = 9999;
 	}
 
@@ -441,6 +440,16 @@ void Command::RobotDoWork()
 			if ((end_worker.hold_object | robots[i].cur.object) == end_worker.need_object && end_worker.time == -1) {
 				end_worker.hold_object = 0;
 				takeoff_need_stat();
+			}
+		}
+
+		if (rt.on_avoid) {
+			auto& cur_way = rt.state == BEFORE ? rt.before_way : rt.after_way;
+			if (GetLength(rt.real_pos, cur_way.back()) <= 0.4) {
+				int target_id = rt.state == BEFORE ? rt.cur.start : rt.cur.end;
+				auto way = get_way(target_id, rt);
+				cur_way = way;
+				rt.on_avoid = false;
 			}
 		}
 
@@ -557,6 +566,9 @@ void Command::RobotSelectWork()
 		robots[i].on_job = true;
 		robots[i].before_way = way;
 		robots[i].after_way = my_route.line;
+		int x, y;
+		get_closePoint(robots[i], x, y);
+		robots[i].start = x * 100 + y;
 #ifdef DEBUG
 		cerr << "机器人" << i << "选择" << idToworker[my_route.start].real_pos.first << " " <<
 			idToworker[my_route.start].real_pos.second << " " << idToworker[my_route.end].real_pos.first
@@ -1214,7 +1226,7 @@ bool Command::obc_check(const pair<double, double>& lhs, const pair<double, doub
 		}*/
 
 		double dis = abs(k * (temp.first - x2) - (temp.second - y2)) / sqrt(k * k + 1);
-		if (dis <= OBCMINDIS) {
+		if (dis <= /*is_before ? OBCBMINDIS : */OBCMINDIS) {
 			return false;
 		}
 	}
@@ -1338,7 +1350,7 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 #endif // DEBUG
 
 		//这里是重点
-		int target_step = robots[index].way_index - BACK_WINDOW;
+		/*int target_step = robots[index].way_index - BACK_WINDOW;
 		target_step = max(target_step, 0);
 		if (robots[index].way_index == 0) {
 			robots[index].object_target = robots[index].real_pos;
@@ -1350,7 +1362,15 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 			if (is_noneObc(cur_way[target_step], robots[index])) {
 				robots[index].object_target = cur_way[target_step];
 			}
-		}
+		}*/
+
+		map = copy_map;
+		int target_id = robots[index].state == BEFORE ? robots[index].start : robots[index].cur.start;
+		auto go_back = get_way(target_id, robots[index]);
+		cur_way = go_back;
+		robots[index].way_index = 0;
+		robots[index].distanceWindex = 0;
+		robots[index].on_avoid = true;
 	}
 	else {
 		//往新路方向前进

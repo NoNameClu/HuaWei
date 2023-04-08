@@ -51,7 +51,7 @@ const double COLL_RADIUS = 3.5;
 const double COLL_ANGLE = M_PI_8;
 const double OUTLINE_RADIUS = M_PI_6;
 const double OBCMINDIS = 0.883553390593273762;
-const double OBCBMINDIS = 0.813553390593273762;
+const double OBCBMINDIS = 0.803553390593273762;
 const double ROBMINDIS = 1.1;
 const double POSCHARGE = 0.353553390593273762;
 
@@ -123,6 +123,7 @@ struct robot {
 	pair<double, double> l_speed;		//线速度
 	pair<double, double> real_pos;		//机器人的当前坐标，每一帧读取的时候要改变
 	pair<double, double> n_pos;
+	int start;
 
 	robot() : on_job(false), can_buy(false), can_sell(false),
 		state(NONE), face(0), a_speed(0), l_speed(make_pair(0, 0)),
