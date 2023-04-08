@@ -1396,9 +1396,23 @@ bool Command::decideAvoid(int check, int target)
 }
 
 //需要判断障碍物距离返回true，不需要返回false
-bool Command::obc_online(const pair<double, double>& obc_pos, const pair<double, double>& lhs, const pair<double, double>& rhs)
+bool Command::obc_online(const pair<double, double>& p0, const pair<double, double>& p1, const pair<double, double>& p2)
 {
-	return false;
+	double m = -(p2.first - p1.first) / (p2.second - p1.second);
+	double distance = GetLength(p1, p2);
+	//t = ((x1 - x0) * (x1 - x2) + (y1 - y0) * (y1 - y2)) / ((x2 - x1)^2 + (y2 - y1)^2)
+	double t = ((p1.first - p0.first) * (p1.first - p2.first) + (p1.second - p0.second) * (p1.second - p2.second)) /
+		(pow(p2.first - p1.first, 2) + pow(p2.second - p1.second, 2));
+	//xp = x0 + t * (y2 - y1)
+	//yp = y0 - t * (x2 - x1)
+	double xp = p0.first + t * (p2.second - p1.second);
+	double yp = p0.second - t * (p2.first - p1.first);
+	double dis1 = GetLength(make_pair(xp, yp), p1);
+	double dis2 = GetLength(make_pair(xp, yp), p2);
+	if (dis1 > distance || dis2 > distance) {
+		return false;
+	}
+	return true;
 }
 
 //从start指向target的线，关于水平角的弧度
