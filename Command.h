@@ -40,6 +40,7 @@ const int PREDICT = 15;
 const int SECONDTOT = 50;
 const int CHECK_WINDOW = 10;
 const int BACK_WINDOW = 5;
+const int Magazine_capacity = 250;
 
 const double VALUE_WEIGHT = 0.2;
 const double LENGTH_WEIGHT = 0.8;
@@ -118,6 +119,7 @@ struct robot {
 	double a_speed;						//角速度
 	double coll_angle;					//防碰旋转角
 	double r_speed;						//真实速度
+	vector<pair<double, double>> weapon;
 	pair<double, double> l_speed;		//线速度
 	pair<double, double> real_pos;		//机器人的当前坐标，每一帧读取的时候要改变
 	pair<double, double> n_pos;
@@ -169,6 +171,7 @@ class Command
 	void RobotSelectWork();	//叶
 	void RobotAvoid(int i);
 	void RobotColl();
+	//void Detroit_Weapons();
 	bool GetRoute(const robot&, route&, int id, const unordered_map<int, double>&);
 	void caculate_nextWay(robot& rb, bool is_before);
 
@@ -218,6 +221,8 @@ class Command
 	void puton_occ_stat(int id);
 	void puton_occ_stat(int id, int object);
 	void puton_need_stat(int id, int object);
+	//void takeoff_occ_stat(int id);
+	//void takeoff_occ_stat(int id, int object);
 public:
 	Command() = default;
 	~Command() = default;

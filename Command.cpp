@@ -36,9 +36,9 @@ bool Command::ReadUntilOK()
 		if (line[0] == 'O' && line[1] == 'K')
 			return true;
 
-//#ifdef DEBUG
-//		cerr << line << endl;
-//#endif // DEBUG
+		//#ifdef DEBUG
+		//		cerr << line << endl;
+		//#endif // DEBUG
 
 
 		buf.push_back(line);
@@ -432,10 +432,10 @@ void Command::RobotDoWork()
 			robots[i].object_target = make_pair(-1, -1);		//卖掉物品后初始化目标地点
 
 			worker& end_worker = idToworker[robots[i].cur.end];
-//#ifdef DEBUG
-//			cerr << end_worker.time << " " << i << endl;
-//			cerr << (end_worker.hold_object & robots[i].cur.object) << " " << end_worker.need_object << endl;
-//#endif // DEBUG
+			//#ifdef DEBUG
+			//			cerr << end_worker.time << " " << i << endl;
+			//			cerr << (end_worker.hold_object & robots[i].cur.object) << " " << end_worker.need_object << endl;
+			//#endif // DEBUG
 
 			puton_need_stat(rt.cur.end, rt.cur.object);
 			if ((end_worker.hold_object | robots[i].cur.object) == end_worker.need_object && end_worker.time == -1) {
@@ -1120,13 +1120,26 @@ bool Command::test_side(int step, int x, int y, bool is_before)
 {
 	int nx = x + dic[step][0], ny = y + dic[step][1];
 	int count = 0;
+	bool flag = false;
+	int c_face = -1;
+	for (int i = 0; i < 4; ++i) {
+		int kx = x + dic[i][0];
+		int ky = y + dic[i][1];
+		if (!is_range(kx, ky) || map[kx][ky] == '#') {
+			flag = true;
+			c_face = i;
+		}
+	}
+	int n_face = -1;
 	for (int i = 0; i < 4; ++i) {
 		int kx = nx + dic[i][0];
 		int ky = ny + dic[i][1];
 		if (!is_range(kx, ky) || map[kx][ky] == '#') {
 			++count;
+			n_face = i;
 		}
 	}
+
 	/*if (is_before) {
 		int kx = nx + dic[step][0], ky = ny + dic[step][1];
 		if (count <= 1 && (is_range(kx, ky) && map[kx][ky] != '#')) {
@@ -1134,11 +1147,14 @@ bool Command::test_side(int step, int x, int y, bool is_before)
 		}
 		return false;
 	}*/
-	if (count) {
-		if (is_before && count == 1) {
-			return true;
-		}
+
+	if ((!is_before && count) || (is_before && count >= 2)) {
 		return false;
+	}
+	if (is_before && flag) {
+		if (abs(c_face - n_face) == 2) {
+			return false;
+		}
 	}
 	return true;
 }
@@ -1192,9 +1208,13 @@ bool Command::obc_check(const pair<double, double>& lhs, const pair<double, doub
 		if (!obc_online(temp, lhs, rhs)) {
 			continue;
 		}
+		/*if (!(temp.first <= max(x2, x1) + OBCMINDIS && temp.first >= min(x2, x1) - OBCMINDIS
+			&& temp.second <= max(y2, y1) + OBCMINDIS && temp.second >= min(y2, y1) - OBCMINDIS)) {
+			continue;
+		}*/
 
 		double dis = abs(k * (temp.first - x2) - (temp.second - y2)) / sqrt(k * k + 1);
-		if (dis <= is_before ? OBCBMINDIS : OBCMINDIS) {
+		if (dis <= OBCMINDIS) {
 			return false;
 		}
 	}
@@ -1210,6 +1230,10 @@ bool Command::obc_check(const pair<double, double>& lhs, const pair<double, doub
 		if (!obc_online(temp, lhs, rhs)) {
 			continue;
 		}
+		/*if (!(temp.first <= max(x2, x1) + ROBMINDIS && temp.first >= min(x2, x1) - ROBMINDIS
+			&& temp.second <= max(y2, y1) + ROBMINDIS && temp.second >= min(y2, y1) - ROBMINDIS)) {
+			continue;
+		}*/
 
 		double dis = abs(k * (temp.first - x2) - (temp.second - y2)) / sqrt(k * k + 1);
 		if (dis <= ROBMINDIS) {
@@ -1297,11 +1321,11 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 		}
 	}
 
-//#ifdef DEBUG
-//	for (const auto& line : map) {
-//		cerr << line << endl;
-//	}
-//#endif // DEBUG
+	//#ifdef DEBUG
+	//	for (const auto& line : map) {
+	//		cerr << line << endl;
+	//	}
+	//#endif // DEBUG
 
 
 	int target = (robots[index].state == BEFORE ? robots[index].cur.start : robots[index].cur.end);
@@ -1374,11 +1398,11 @@ bool Command::check_avoid(robot& check, const robot& target)
 
 			double k_lhs = caculate_radius(templ, tempkl), k_rhs = caculate_radius(tempr, tempkr);*/
 
-//#ifdef DEBUG
-//			cerr << k_lhs << " " << k_rhs << " ";
-//#endif // DEBUG
+			//#ifdef DEBUG
+			//			cerr << k_lhs << " " << k_rhs << " ";
+			//#endif // DEBUG
 
-			
+
 			if (GetLength(cur_way[i], t_way[j]) <= ROBMINDIS /*&& abs(k_lhs - k_rhs) >= M_PI_2*/) {
 				//check.avoid_index = min(check.avoid_index, i);
 				return true;
@@ -1403,12 +1427,22 @@ bool Command::obc_online(const pair<double, double>& p0, const pair<double, doub
 	//t = ((x1 - x0) * (x1 - x2) + (y1 - y0) * (y1 - y2)) / ((x2 - x1)^2 + (y2 - y1)^2)
 	double t = ((p1.first - p0.first) * (p1.first - p2.first) + (p1.second - p0.second) * (p1.second - p2.second)) /
 		(pow(p2.first - p1.first, 2) + pow(p2.second - p1.second, 2));
+
+	// k = -((x1 - x0) * (x2 - x1) + (y1 - y0) * (y2 - y1)) / ((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
+	double k = -((p1.first - p0.first) * (p2.first - p1.first) + (p1.second - p0.second) * (p2.second - p1.second)) /
+		((p1.first - p2.first) * (p1.first - p2.first) + (p1.second - p2.second) * (p1.second - p2.second));
+
+	//xf = k * (x2 - x1) + x1
+	//yf = k * (y2 - y1) + y1
+	double xf = k * (p2.first - p1.first) + p1.first;
+	double yf = k * (p2.second - p1.second) + p1.second;
+
 	//xp = x0 + t * (y2 - y1)
 	//yp = y0 - t * (x2 - x1)
 	double xp = p0.first + t * (p2.second - p1.second);
 	double yp = p0.second - t * (p2.first - p1.first);
-	double dis1 = GetLength(make_pair(xp, yp), p1);
-	double dis2 = GetLength(make_pair(xp, yp), p2);
+	double dis1 = GetLength(make_pair(xf, yf), p1);
+	double dis2 = GetLength(make_pair(xf, yf), p2);
 	if (dis1 > distance || dis2 > distance) {
 		return false;
 	}
@@ -1433,7 +1467,7 @@ double Command::caculate_radius(const pair<double, double>& target, const pair<d
 vector<pair<double, double>> Command::can_reach(const worker& start, const worker& end, double& distance)
 {
 	distance = 0;
-	auto org =  BFS(start.pos, end.pos, distance, false);
+	auto org = BFS(start.pos, end.pos, distance, false);
 	vector<pair<double, double>> ret;
 
 	//遍历原始序列，将其转换为真实坐标
