@@ -50,6 +50,7 @@ const double COLL_RADIUS = 3.5;
 const double COLL_ANGLE = M_PI_8;
 const double OUTLINE_RADIUS = M_PI_6;
 const double OBCMINDIS = 0.883553390593273762;
+const double OBCBMINDIS = 0.813553390593273762;
 const double ROBMINDIS = 1.1;
 const double POSCHARGE = 0.353553390593273762;
 
@@ -86,8 +87,8 @@ struct route {
 	double length;
 	int object;						//当前路线操作的物品
 	int stat;						//表示当前路线的状态
-	vector<int> line;				//路线数组
-	//vector<pair<double, double>> new_line;	//新路线数组
+	//vector<int> line;				//路线数组
+	vector<pair<double, double>> line;
 
 	route() = default;
 	route(int s, int e) : start(s), end(e) {};
@@ -108,8 +109,8 @@ struct robot {
 	double route_face;					//路线方向
 	pair<double, double> object_target;
 	//改声明
-	vector<int> before_way, after_way;
-	//vector<pair<double, double>> new_before_way, new_after_way;
+	//vector<int> before_way, after_way;
+	vector<pair<double, double>> before_way, after_way;
 	robot_state state;
 	route cur;
 
@@ -188,23 +189,25 @@ class Command
 	bool is_range(int x, int y);
 	void Get_acc(const robot& rb, unordered_map<int, double>& accessible);
 	void get_closePoint(const robot& rb, int& x, int& y);
-	bool is_noneObc(int id, const robot& rb);		//修改
+	bool is_noneObc(const pair<double, double>& id, const robot& rb);
 	bool test_side(int step, int x, int y, bool is_before);
 	bool is_same_face(const robot& rb);
 	bool robots_has_obc(const robot& lhs, const robot& rhs);
-	bool obc_check(const pair<double, double>& lhs, const pair<double, double>& rhs);
+	bool obc_check(const pair<double, double>& lhs, const pair<double, double>& rhs, bool is_before);
 	void target_slowdown(const robot& rt, double& speed, double& angle);
 	void caculate_robotPos(robot& rb);
 	void GetNewWay(int index, const unordered_set<int>& avoid_wait);
 	bool worker_exist(const pair<int, int>& cur);
 	bool check_avoid(robot& check, const robot& target);
 	bool decideAvoid(int check, int target);
+	bool obc_online(const pair<double, double>& obc_pos, const pair<double, double>& lhs, const pair<double, double>& rhs);
 	double caculate_radius(const pair<double, double>& lhs, const pair<double, double>& rhs);
-	vector<int> can_reach(const worker& start, const worker& end, double& distance);
-	vector<int> get_way(int id, const robot& rb);
+	//vector<int> can_reach(const worker& start, const worker& end, double& distance);
+	//vector<int> get_way(int id, const robot& rb);
+	vector<pair<double, double>> can_reach(const worker& start, const worker& end, double& distance);
+	vector<pair<double, double>> get_way(int id, const robot& rb);
+	pair<double, double> caculate_realway(int id);
 	vector<int> BFS(const pair<int, int>& start, const pair<int, int>& end, double& distance, bool is_before);
-	pair<double, double> change_point(int id);	//id转pair<double,double>函数，规避周围没有障碍。
-	vector<pair<double, double>> change_line(const vector<int>& origin_way);	//旧路线转新路线
 
 	void Clean_list();
 	void flush_list();

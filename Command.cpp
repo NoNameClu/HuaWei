@@ -216,7 +216,7 @@ void Command::initMap()
 			}*/
 			double distance = 0;					//工作台之间的距离
 			//改成double，double
-			vector<int> way = can_reach(start, end, distance);		//start节点可以碰到end节点就可以继续（BFS）
+			auto way = can_reach(start, end, distance);		//start节点可以碰到end节点就可以继续（BFS）
 			//
 			if (way.empty()) {
 				continue;
@@ -227,8 +227,7 @@ void Command::initMap()
 			temp.object = start.product_object;
 			temp.length = distance;
 			temp.stat = NO_PRODUCT;
-
-			temp.line = way;		//	new_way存avaliable数组
+			temp.line = way;
 			unavaliable.push_back(temp);
 		}
 	}
@@ -552,14 +551,12 @@ void Command::RobotSelectWork()
 		}
 		flush_list();
 
-		vector<int> way = get_way(my_route.start, robots[i]);	//当前机器人到起点的距离以及路线
+		robots[i].state = BEFORE;
+		auto way = get_way(my_route.start, robots[i]);	//当前机器人到起点的距离以及路线
 		robots[i].cur = my_route;
 		robots[i].on_job = true;
-		robots[i].state = BEFORE;
 		robots[i].before_way = way;
-		robots[i].after_way = my_route.line;	// 修改
-		//robots[i].new_before_way = way;
-		//robots[i].new_after_way = my_route.new_line;
+		robots[i].after_way = my_route.line;
 #ifdef DEBUG
 		cerr << "机器人" << i << "选择" << idToworker[my_route.start].real_pos.first << " " <<
 			idToworker[my_route.start].real_pos.second << " " << idToworker[my_route.end].real_pos.first
@@ -701,7 +698,6 @@ bool Command::GetRoute(const robot& rb, route& ret, int id, const unordered_map<
 void Command::caculate_nextWay(robot& rb, bool is_before)
 {
 	const auto& cur_way = rb.state == BEFORE ? rb.before_way : rb.after_way;
-	//const auto& cur_way = rb.state == BEFORE ? rb.new_before_way : rb.new_after_way;
 
 	////若能前往当前的目标地点或者没有到达目标地点
 	//if (abs(-1 - rb.object_target.first) > 1e-6 && GetLength(rb.real_pos, rb.object_target) >= 0.4 && obc_check(rb.real_pos, rb.object_target)) {
@@ -740,25 +736,18 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 		back_ind = cur_way.size() - 1;
 		for (; back_ind >= 0; --back_ind) {
 			if (is_noneObc(cur_way[back_ind], rb)) {
-				idToreal(cur_way[back_ind], rb.object_target);
-				//rb.object_target = cur_way[back_ind];
-				pair<double, double> temp;
-				idToreal(cur_way[back_ind], temp);
-				rb.route_face = caculate_radius(temp, rb.real_pos);
+				rb.object_target = cur_way[back_ind];
+				rb.route_face = caculate_radius(cur_way[back_ind], rb.real_pos);
 				break;
 			}
 		}
 	}
 	else {
-		idToreal(cur_way[back_ind + 1], rb.object_target);
-		//rb.object_target = cur_way[back_ind];
+		rb.object_target = cur_way[back_ind + 1];
 		for (int i = cur_way.size() - 1; i > back_ind; --i) {
 			if (is_noneObc(cur_way[i], rb)) {
-				idToreal(cur_way[i], rb.object_target);
-				//rb.object_target = cur_way[back_ind];
-				pair<double, double> temp;
-				idToreal(cur_way[i], temp);
-				rb.route_face = caculate_radius(temp, rb.real_pos);
+				rb.object_target = cur_way[i];
+				rb.route_face = caculate_radius(cur_way[i], rb.real_pos);
 				break;
 			}
 		}
@@ -1055,6 +1044,7 @@ bool Command::worker_avaliable(int x, int y)
 }
 
 // is_range判断判断点是否在地图内
+//在范围内返回true， 不在返回false
 bool Command::is_range(int x, int y)
 {
 	if (x >= 0 && x < map.size() && y >= 0 && y < map[0].size()) {
@@ -1119,11 +1109,9 @@ void Command::get_closePoint(const robot& rb, int& x, int& y)
 }
 
 //有障碍物返回false;
-bool Command::is_noneObc(int id, const robot& rb)	// 这边修改，id是pair
+bool Command::is_noneObc(const pair<double, double>& id, const robot& rb)
 {
-	pair<double, double> temp;
-	idToreal(id, temp);
-	return obc_check(temp, rb.real_pos);
+	return obc_check(id, rb.real_pos, rb.state == BEFORE);
 }
 
 // 判断在不在地图边界或者是否有障碍物
@@ -1147,6 +1135,9 @@ bool Command::test_side(int step, int x, int y, bool is_before)
 		return false;
 	}*/
 	if (count) {
+		if (is_before && count == 1) {
+			return true;
+		}
 		return false;
 	}
 	return true;
@@ -1181,11 +1172,11 @@ bool Command::is_same_face(const robot& rb)
 //有障碍物返回true，没有返回false
 bool Command::robots_has_obc(const robot& lhs, const robot& rhs)
 {
-	return !obc_check(lhs.real_pos, rhs.real_pos);
+	return !obc_check(lhs.real_pos, rhs.real_pos, lhs.state == BEFORE && rhs.state == BEFORE);
 }
 
 //有障碍物返回false
-bool Command::obc_check(const pair<double, double>& lhs, const pair<double, double>& rhs)
+bool Command::obc_check(const pair<double, double>& lhs, const pair<double, double>& rhs, bool is_before)
 {
 	double x1 = lhs.first, y1 = lhs.second;
 	double x2 = rhs.first, y2 = rhs.second;
@@ -1195,17 +1186,15 @@ bool Command::obc_check(const pair<double, double>& lhs, const pair<double, doub
 	double k = tan(theta);
 
 	for (const auto& id : obcTot) {
-		int x = id / 100, y = id % 100;
 		pair<double, double> temp;
-		mapToreal(make_pair(x, y), temp);
+		idToreal(id, temp);
 
-		if (!(temp.first <= max(x2, x1) + OBCMINDIS && temp.first >= min(x2, x1) - OBCMINDIS
-			&& temp.second <= max(y2, y1) + OBCMINDIS && temp.second >= min(y2, y1) - OBCMINDIS)) {
+		if (!obc_online(temp, lhs, rhs)) {
 			continue;
 		}
 
 		double dis = abs(k * (temp.first - x2) - (temp.second - y2)) / sqrt(k * k + 1);
-		if (dis <= OBCMINDIS) {
+		if (dis <= is_before ? OBCBMINDIS : OBCMINDIS) {
 			return false;
 		}
 	}
@@ -1218,8 +1207,7 @@ bool Command::obc_check(const pair<double, double>& lhs, const pair<double, doub
 			continue;
 		}
 
-		if (!(temp.first <= max(x2, x1) + ROBMINDIS && temp.first >= min(x2, x1) - ROBMINDIS
-			&& temp.second <= max(y2, y1) + ROBMINDIS && temp.second >= min(y2, y1) - ROBMINDIS)) {
+		if (!obc_online(temp, lhs, rhs)) {
 			continue;
 		}
 
@@ -1234,7 +1222,7 @@ bool Command::obc_check(const pair<double, double>& lhs, const pair<double, doub
 	//double x1 = lhs.first, y1 = lhs.second;
 	//double x2 = rhs.first, y2 = rhs.second;
 	//double distance = GetLength(lhs, rhs);
-	//	求直线
+	//	//求直线
 	//double k = (y1 - y2) / (x1 - x2);
 	//for (const auto& num : obcTot) {
 	//	pair<double, double> real;
@@ -1273,15 +1261,13 @@ void Command::target_slowdown(const robot& rt, double& speed, double& angle)
 void Command::caculate_robotPos(robot& rb)
 {
 	const auto& cur_way = rb.state == BEFORE ? rb.before_way : rb.after_way;
-	//const auto& cur_way = rb.state == BEFORE ? rb.new_before_way : rb.new_after_way;
 
 	int index = -1;
 	double dis = 9999;
 	for (int i = 0; i < cur_way.size(); ++i) {
-		pair<double, double> dis_temp;
-		idToreal(cur_way[i], dis_temp);
-		double cur_dis = GetLength(dis_temp, rb.real_pos);
-		//double cur_dis = GetLength(cur_way[i], rb.real_pos);
+		/*pair<double, double> dis_temp;
+		idToreal(cur_way[i], dis_temp);*/
+		double cur_dis = GetLength(cur_way[i], rb.real_pos);
 		if (cur_dis < dis) {
 			dis = cur_dis;
 			index = i;
@@ -1302,11 +1288,9 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 	//避免重路
 	for (const auto& ind : avoid_wait) {
 		const auto& cur_way = robots[ind].state == BEFORE ? robots[ind].before_way : robots[ind].after_way;
-		//const auto& cur_way = robots[ind].state == BEFORE ? robots[ind].new_before_way : robots[ind].new_after_way;
 		for (int start = robots[ind].way_index; start < min((int)cur_way.size(), robots[ind].way_index + CHECK_WINDOW); ++start) {
 			pair<int, int> pos;
-			idTomap(cur_way[start], pos);
-			//realTomap(cur_way[start], pos);
+			realTomap(cur_way[start], pos);
 			if (!worker_exist(pos)) {
 				map[pos.first][pos.second] = '#';
 			}
@@ -1322,7 +1306,6 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 
 	int target = (robots[index].state == BEFORE ? robots[index].cur.start : robots[index].cur.end);
 	auto& cur_way = robots[index].state == BEFORE ? robots[index].before_way : robots[index].after_way;
-	//auto& cur_way = robots[index].state == BEFORE ? robots[index].new_before_way : robots[index].new_after_way;
 	auto way = get_way(target, robots[index]);
 	if (way.empty()) {
 		//后退
@@ -1338,12 +1321,10 @@ void Command::GetNewWay(int index, const unordered_set<int>& avoid_wait)
 			map = copy_map;
 			return;
 		}
-		idToreal(cur_way[robots[index].way_index], robots[index].object_target);
-		//robots[index].object_target = cur_way[robots[index].way_index];
+		robots[index].object_target = cur_way[robots[index].way_index];
 		for (target_step; target_step > robots[index].way_index; --target_step) {
 			if (is_noneObc(cur_way[target_step], robots[index])) {
-				idToreal(cur_way[target_step], robots[index].object_target);
-				//robots[index].object_target = cur_way[target_step];
+				robots[index].object_target = cur_way[target_step];
 			}
 		}
 	}
@@ -1380,18 +1361,14 @@ bool Command::check_avoid(robot& check, const robot& target)
 {
 	const auto& cur_way = check.state == BEFORE ? check.before_way : check.after_way;
 	const auto& t_way = target.state == BEFORE ? target.before_way : target.after_way;
-	//const auto& cur_way = check.state == BEFORE ? check.new_before_way : check.new_after_way;
-	//const auto& t_way = target.state == BEFORE ? target.new_before_way : target.new_after_way;
+
 	int lhs = check.way_index, rhs = target.way_index;
 
 	for (int i = lhs + 1; i < min((int)cur_way.size(), lhs + CHECK_WINDOW); ++i) {
 		for (int j = rhs + 1; j < min((int)t_way.size(), rhs + CHECK_WINDOW); ++j) {
 			pair<double, double> templ, tempr, tempkl, tempkr;
-			idToreal(cur_way[i], templ);
-			idToreal(t_way[j], tempr);
-			//templ = cur_way[i];
-			//tempr = t_way[j];
-
+			//idToreal(cur_way[i], templ);
+			//idToreal(t_way[j], tempr);
 			/*idToreal(cur_way[i - 1], tempkl);
 			idToreal(t_way[j - 1], tempkr);
 
@@ -1402,7 +1379,7 @@ bool Command::check_avoid(robot& check, const robot& target)
 //#endif // DEBUG
 
 			
-			if (GetLength(templ, tempr) <= ROBMINDIS /*&& abs(k_lhs - k_rhs) >= M_PI_2*/) {
+			if (GetLength(cur_way[i], t_way[j]) <= ROBMINDIS /*&& abs(k_lhs - k_rhs) >= M_PI_2*/) {
 				//check.avoid_index = min(check.avoid_index, i);
 				return true;
 			}
@@ -1418,6 +1395,12 @@ bool Command::decideAvoid(int check, int target)
 	return c.rate == t.rate ? check < target : c.rate < t.rate;
 }
 
+//需要判断障碍物距离返回true，不需要返回false
+bool Command::obc_online(const pair<double, double>& obc_pos, const pair<double, double>& lhs, const pair<double, double>& rhs)
+{
+	return false;
+}
+
 //从start指向target的线，关于水平角的弧度
 double Command::caculate_radius(const pair<double, double>& target, const pair<double, double>& start)
 {
@@ -1427,71 +1410,66 @@ double Command::caculate_radius(const pair<double, double>& target, const pair<d
 	double t_y = x1 - x2;
 	return atan2(t_x, t_y);
 }
-// 新增点转换函数
-pair<double, double> Command::change_point(const int id) {
-	bool flag = false;	// 周围有无障碍
-	pair<double, double> point;
-	idToreal(id, point);
-	int x = id / 100, y = id % 100;
-	for (int i = 0; i < 4; ++i) {
-		int kx = x + dic[i][0], ky = y + dic[i][1];
-		if (!is_range(kx, ky) || map[kx][ky] == '#') {
-			int x2 = x - dic[i][0], y2 = y - dic[i][1];
-			pair<double, double> point2;
-			idToreal(x2 * 100 + y2, point2);
-			point.first = (point.first + point2.first) / 2;
-			point.second = (point.second + point2.second) / 2;
-			break;
-		}
-	}
-//#ifdef DEBUG
-//	cerr << point.first << " " << point.second << endl;
-//#endif // DEBUG
 
-	return point;
-}
+//vector<int> Command::can_reach(const worker& start, const worker& end, double& distance) {
+//	distance = 0;
+//	return BFS(start.pos, end.pos, distance, false);
+//}
 
-// 新增路线转换函数
-vector<pair<double, double>> Command::change_line(const vector<int>& origin_way) {
-	vector<pair<double, double>> res;
-	for (const auto& id : origin_way) {
-		pair<double, double> real_pos= change_point(id);
-		res.push_back(real_pos);
-	}
-#ifdef DEBUG
-	cerr << res.size() << endl;
-#endif // DEBUG
-
-	return res;
-}
-
-vector<int> Command::can_reach(const worker& start, const worker& end, double& distance)
+vector<pair<double, double>> Command::can_reach(const worker& start, const worker& end, double& distance)
 {
-	//distance = 0;
+	distance = 0;
+	auto org =  BFS(start.pos, end.pos, distance, false);
+	vector<pair<double, double>> ret;
 
-	//这里先将数组保存下来
-	//将int型下标转化为pair
-	vector<int> origin_way = BFS(start.pos, end.pos, distance, false);
-	vector<pair<double, double>> way; 
-	way = change_line(origin_way);
-	return origin_way;
+	//遍历原始序列，将其转换为真实坐标
+	for (int i = 0; i < org.size(); ++i) {
+		pair<double, double> temp = caculate_realway(org[i]);
+		ret.push_back(temp);
+	}
+
+	return ret;
 }
 
 //返回值改成pair
-vector<int> Command::get_way(int id, const robot& rb)
+vector<pair<double, double>> Command::get_way(int id, const robot& rb)
 {
 	int x, y;
 	get_closePoint(rb, x, y);
 
 	int t_x = id / 100, t_y = id % 100;
 	double temp;
-	vector<int> origin_way = BFS(make_pair(x, y), make_pair(t_x, t_y), temp, true);
-#ifdef DEBUG
-	cerr << origin_way.size() << endl;
-#endif // DEBUG
+	auto org = BFS(make_pair(x, y), make_pair(t_x, t_y), temp, rb.state == BEFORE);
 
-	vector<pair<double, double>> way = change_line(origin_way);
-	return origin_way;
+	vector<pair<double, double>> ret;
+	//遍历原始序列，将其转换为真实坐标
+	for (int i = 0; i < org.size(); ++i) {
+		pair<double, double> temp = caculate_realway(org[i]);
+		ret.push_back(temp);
+	}
+
+	return ret;
+}
+
+pair<double, double> Command::caculate_realway(int id)
+{
+	pair<double, double> ret;
+	bool flag = false;
+	pair<int, int> temp;
+	idTomap(id, temp);
+	idToreal(id, ret);
+	for (int i = 0; i < 4; ++i) {
+		int nx = temp.first + dic[i][0];
+		int ny = temp.second + dic[i][1];
+		if (!is_range(nx, ny) || map[nx][ny] == '#') {
+			flag = true;
+			ret.first -= ((double)dic[i][1] * 0.25);
+			ret.second += ((double)dic[i][0] * 0.25);
+			break;
+		}
+	}
+
+	return ret;
 }
 
 //	清除avaliable，重置unavaliable
