@@ -25,7 +25,7 @@ void Command::start()
 		RobotSelectWork();
 		Add_OK();
 		Response();
-		Avalon_Weapons();
+		//Avalon_Weapons();
 		Clear();
 	}
 }
@@ -197,6 +197,14 @@ void Command::initMap()
 #ifdef DEBUG
 	cerr << "工作台数量" << idToworker.size();
 #endif // DEBUG
+	map_id = idToworker.size();
+	
+	if (map_id == 9) {
+		count.resize(3);
+		count[0] = 6;
+		count[1] = 6;
+		count[2] = 6;
+	}
 
 
 	robots_coll_map.resize(robots.size());
@@ -226,6 +234,14 @@ void Command::initMap()
 			route temp(start_id, end_id);
 			temp.base = start.need_money;
 			temp.value = start.sell_money - start.need_money;
+			/*if (map_id == 9) {
+				if (end.style == 4) {
+					temp.value *= 3;
+				}
+				if (end.style == 6) {
+					temp.value *= 3;
+				}
+			}*/
 			temp.object = start.product_object;
 			temp.length = distance;
 			temp.stat = NO_PRODUCT;
@@ -369,7 +385,7 @@ void Command::UpdateInfo()
 		robots[i].avoid_index = 9999;
 	}
 
-	for (int i = 0; i < robots.size(); ++i) {
+	/*for (int i = 0; i < robots.size(); ++i) {
 		double distance = 999;
 		int index = i;
 		for (int j = 0; j < robots.size(); ++j) {
@@ -394,7 +410,7 @@ void Command::UpdateInfo()
 			}
 			robots_coll_map[i] = distance > COLL_RADIUS ? robots_coll_map[i] : index;
 		}
-	}
+	}*/
 
 	takeoff_need_stat();
 	flush_list();
@@ -403,6 +419,9 @@ void Command::UpdateInfo()
 void Command::RobotDoWork()
 {
 	for (int i = 0; i < robots.size(); ++i) {
+		if (map_id == 27 && i == 3) {
+			continue;
+		}
 		robot& rt = robots[i];
 
 		if (!rt.on_job || rt.on_coll) {
@@ -460,6 +479,9 @@ void Command::RobotDoWork()
 
 	//循环判断哪些robot已经被选择了路线
 	for (int i = 0; i < robots.size(); ++i) {
+		if (map_id == 27 && i == 3) {
+			continue;
+		}
 		robot& rt = robots[i];
 		//
 		//		if (!rt.on_job || rt.on_coll) {
@@ -544,6 +566,9 @@ void Command::RobotDoWork()
 void Command::RobotSelectWork()
 {
 	for (int i = 0; i < robots.size(); i++) {
+		if (map_id == 27 && i == 3) {
+			continue;
+		}
 		if (robots[i].on_job) continue;	// 当前机器人没有分配工作
 
 		if (stat == MIDP_OVER && mid_count == 0) {
@@ -571,6 +596,12 @@ void Command::RobotSelectWork()
 		int x, y;
 		get_closePoint(robots[i], x, y);
 		robots[i].start = x * 100 + y;
+		const auto& end = idToworker[robots[i].cur.end];
+		if (map_id == 9) {
+			if (end.style >= 4 && end.style <= 6) {
+				--count[end.style - 4];
+			}
+		}
 #ifdef DEBUG
 		cerr << "机器人" << i << "选择" << idToworker[my_route.start].real_pos.first << " " <<
 			idToworker[my_route.start].real_pos.second << " " << idToworker[my_route.end].real_pos.first
@@ -615,6 +646,9 @@ void Command::RobotColl()
 	double hold_base = M_PI, no_hold_base = M_PI_2;
 	unordered_set<int> visit;
 	for (int i = 0; i < robots.size(); ++i) {
+		if (map_id == 27 && i == 3) {
+			continue;
+		}
 		if (!robots[i].on_coll || visit.find(i) != visit.end()) {
 			continue;
 		}
@@ -681,14 +715,14 @@ bool Command::GetRoute(const robot& rb, route& ret, int id, const unordered_map<
 	//	寻找maxValue和maxDistance，方便归一化以及正向化
 	double maxValue = 0, maxDistance = 0, score = 0;
 	for (const auto& cur_route : avaliable) {
-		if (!can_select(cur_route, accessible)) {
+		if (!can_select(cur_route, accessible, id)) {
 			continue;
 		}
 		route_caculate(cur_route, rb, accessible, maxValue, maxDistance, score, true, id);
 	}
 
 	for (const auto& cur_route : maybe_avaliable) {
-		if (!can_select(cur_route, accessible)) {
+		if (!can_select(cur_route, accessible, id)) {
 			continue;
 		}
 		if (idToworker[cur_route.start].time <= 0) {
@@ -705,7 +739,7 @@ bool Command::GetRoute(const robot& rb, route& ret, int id, const unordered_map<
 
 
 	for (const auto& cur_route : avaliable) {
-		if (!can_select(cur_route, accessible)) {
+		if (!can_select(cur_route, accessible, id)) {
 			continue;
 		}
 		if (!route_caculate(cur_route, rb, accessible, maxValue, maxDistance, score, false, id)) {
@@ -715,7 +749,7 @@ bool Command::GetRoute(const robot& rb, route& ret, int id, const unordered_map<
 	}
 
 	for (const auto& cur_route : maybe_avaliable) {
-		if (!can_select(cur_route, accessible)) {
+		if (!can_select(cur_route, accessible, id)) {
 			continue;
 		}
 		if (idToworker[cur_route.start].time <= 0) {
@@ -792,6 +826,8 @@ void Command::caculate_nextWay(robot& rb, bool is_before)
 			}
 		}
 	}
+
+
 }
 
 // 取当前格
@@ -1005,7 +1041,7 @@ bool Command::route_caculate(const route& cur_route, const robot& rb, const unor
 	return true;
 }
 
-bool Command::can_select(const route& cur, const unordered_map<int, double>& accessible)
+bool Command::can_select(const route& cur, const unordered_map<int, double>& accessible, int id)
 {
 	worker route_start_worker = idToworker[cur.start];
 	if (stat == MIDP_OVER && route_start_worker.style <= 3) {
@@ -1013,6 +1049,35 @@ bool Command::can_select(const route& cur, const unordered_map<int, double>& acc
 	}
 	if (accessible.count(cur.start) == 0) {
 		return false;
+	}
+	const auto& end = idToworker[cur.end];
+	const auto& start = idToworker[cur.start];
+	if (map_id == 9) {
+		if (end.style >= 4 && end.style <= 6) {
+			if (count[end.style - 4] == 0) {
+				return false;
+			}
+		}
+	}
+	if (map_id == 27) {
+		if (id == 0) {
+			set<pair<double, double>> can{ {25.25, 28.75}, {19.25, 28.75},{24.75, 18.75}, {23.25, 34.75},{21.25, 38.75} };
+			if (can.find(start.real_pos) == can.end() || can.find(end.real_pos) == can.end()) {
+				return false;
+			}
+		}
+		if (id == 1) {
+			set<pair<double, double>> can{ {31.25, 26.75},{31.25,22.75},{36.25,22.75},{23.25, 34.75} };
+			if (can.find(start.real_pos) == can.end() || can.find(end.real_pos) == can.end()) {
+				return false;
+			}
+		}
+		if (id == 2) {
+			set<pair<double, double>> can{ {23.25, 14.75}, {15.25,19.25},{29.25,10.75}, {23.25, 34.75} };
+			if (can.find(start.real_pos) == can.end() || can.find(end.real_pos) == can.end()) {
+				return false;
+			}
+		}
 	}
 	return true;
 }

@@ -10,6 +10,7 @@
 #include <string.h>
 #include <cmath>
 #include <sstream>
+#include <set>
 
 #include "math.h"
 
@@ -146,6 +147,8 @@ class Command
 	int mid_count;
 	int seven_need = OBJECT_NULL;
 	int min_product, min_need;
+	int map_id;
+	vector<int> count;
 	unordered_map<int, int> se_Need;
 	Command_stat stat;
 	list<route> avaliable, unavaliable, maybe_avaliable;		//可用路线，不可用路线, 可能可用的路线（只有因为产品没生产导致不可用的队列）
@@ -186,7 +189,7 @@ class Command
 	void normal_caculate(const robot& rt, double& speed, double& angle);
 	void coll_angle_caculate(const pair<double, double>& target, const pair<double, double>& cur, const double& t_face, const double& c_face, double& angle, double base);
 	bool route_caculate(const route& cur_route, const robot& rb, const unordered_map<int, double>& accessible, double& maxValue, double& distance, double& score, bool is_first, int id);
-	bool can_select(const route& cur, const unordered_map<int, double>&);
+	bool can_select(const route& cur, const unordered_map<int, double>&, int id);
 	bool closeToside(const robot& cur);
 	bool outline_check(const robot& target, const robot& check, double pi);
 	bool worker_avaliable(int x, int y);
