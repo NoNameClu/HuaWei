@@ -198,7 +198,7 @@ void Command::initMap()
 	cerr << "工作台数量" << idToworker.size();
 #endif // DEBUG
 	map_id = idToworker.size();
-	
+
 	if (map_id == 9) {
 		count.resize(3);
 		count[0] = 6;
@@ -385,7 +385,7 @@ void Command::UpdateInfo()
 		robots[i].avoid_index = 9999;
 	}
 
-	/*for (int i = 0; i < robots.size(); ++i) {
+	for (int i = 0; i < robots.size(); ++i) {
 		double distance = 999;
 		int index = i;
 		for (int j = 0; j < robots.size(); ++j) {
@@ -410,7 +410,7 @@ void Command::UpdateInfo()
 			}
 			robots_coll_map[i] = distance > COLL_RADIUS ? robots_coll_map[i] : index;
 		}
-	}*/
+	}
 
 	takeoff_need_stat();
 	flush_list();
@@ -419,15 +419,15 @@ void Command::UpdateInfo()
 
 void Command::RobotDoWork()
 {
-	bool is_in_danger=false;
+	bool is_in_danger = false;
 	const vector<double> x{ 22.25,30.25 };
 	const vector<double> y{ 28.75,35.75 };
 	int index = -1;
 
 	for (int i = 0; i < robots.size(); ++i) {
-		if (map_id == 27 && i == 3) {
+		/*if (map_id == 27 && i == 3) {
 			continue;
-		}
+		}*/
 		robot& rt = robots[i];
 
 		if (!rt.on_job || rt.on_coll) {
@@ -480,22 +480,23 @@ void Command::RobotDoWork()
 			}
 		}
 
-		if (rt.real_pos.first > x[0] && rt.real_pos.first<x[1] &&
-			rt.real_pos.second>y[0] && rt.real_pos.second < y[1]) {
-			is_in_danger = true;
-			index = i;
+		if (map_id == 27) {
+			if (rt.real_pos.first > x[0] && rt.real_pos.first<x[1] &&
+				rt.real_pos.second>y[0] && rt.real_pos.second < y[1]) {
+				is_in_danger = true;
+				index = i;
+			}
 		}
-
 		caculate_robotPos(rt);
 	}
 
 	//循环判断哪些robot已经被选择了路线
 	//有几个机器人在危险区内
-	
+
 	for (int i = 0; i < robots.size(); ++i) {
-		if (map_id == 27 && i == 3) {
+		/*if (map_id == 27 && i == 3) {
 			continue;
-		}
+		}*/
 		robot& rt = robots[i];
 		//
 		//		if (!rt.on_job || rt.on_coll) {
@@ -563,9 +564,11 @@ void Command::RobotDoWork()
 		double speed, angle;
 		normal_caculate(rt, speed, angle);
 
-		if (i != index && is_in_danger && rt.object_target.first > x[0] && rt.object_target.first<x[1] &&
-			rt.object_target.second>y[0] && rt.object_target.second < y[1]) {
-			speed = 0;
+		if (map_id == 27) {
+			if (i != index && is_in_danger && rt.object_target.first > x[0] && rt.object_target.first<x[1] &&
+				rt.object_target.second>y[0] && rt.object_target.second < y[1]) {
+				speed = 0;
+			}
 		}
 
 
@@ -586,9 +589,9 @@ void Command::RobotDoWork()
 void Command::RobotSelectWork()
 {
 	for (int i = 0; i < robots.size(); i++) {
-		if (map_id == 27 && i == 3) {
+		/*if (map_id == 27 && i == 3) {
 			continue;
-		}
+		}*/
 		if (robots[i].on_job) continue;	// 当前机器人没有分配工作
 
 		if (stat == MIDP_OVER && mid_count == 0) {
@@ -666,9 +669,9 @@ void Command::RobotColl()
 	double hold_base = M_PI, no_hold_base = M_PI_2;
 	unordered_set<int> visit;
 	for (int i = 0; i < robots.size(); ++i) {
-		if (map_id == 27 && i == 3) {
+		/*if (map_id == 27 && i == 3) {
 			continue;
-		}
+		}*/
 		if (!robots[i].on_coll || visit.find(i) != visit.end()) {
 			continue;
 		}
@@ -1074,13 +1077,20 @@ bool Command::can_select(const route& cur, const unordered_map<int, double>& acc
 	const auto& start = idToworker[cur.start];
 	if (map_id == 9) {
 		if (end.style >= 4 && end.style <= 6) {
-			if (count[end.style - 4] == 0) {
-				return false;
+			int c = end.style - 3;
+			while (c <= 2) {			
+				if (count[c] != 0) {
+					return false;
+				}
+				++c;
 			}
+			/*if (count[end.style - 4] == 0) {
+				return false;
+			}*/
 		}
 	}
 	if (map_id == 27) {
-		if (id == 0) {
+		/*if (id == 0) {
 			set<pair<double, double>> can{ {25.25, 28.75}, {19.25, 28.75},{24.75, 18.75}, {23.25, 34.75},{21.25, 38.75} };
 			if (can.find(start.real_pos) == can.end() || can.find(end.real_pos) == can.end()) {
 				return false;
@@ -1097,7 +1107,7 @@ bool Command::can_select(const route& cur, const unordered_map<int, double>& acc
 			if (can.find(start.real_pos) == can.end() || can.find(end.real_pos) == can.end()) {
 				return false;
 			}
-		}
+		}*/
 	}
 	return true;
 }
