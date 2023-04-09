@@ -416,8 +416,14 @@ void Command::UpdateInfo()
 	flush_list();
 }
 
+
 void Command::RobotDoWork()
 {
+	bool is_in_danger=false;
+	const vector<double> x{ 22.25,30.25 };
+	const vector<double> y{ 28.75,35.75 };
+	int index = -1;
+
 	for (int i = 0; i < robots.size(); ++i) {
 		if (map_id == 27 && i == 3) {
 			continue;
@@ -474,10 +480,18 @@ void Command::RobotDoWork()
 			}
 		}
 
+		if (rt.real_pos.first > x[0] && rt.real_pos.first<x[1] &&
+			rt.real_pos.second>y[0] && rt.real_pos.second < y[1]) {
+			is_in_danger = true;
+			index = i;
+		}
+
 		caculate_robotPos(rt);
 	}
 
 	//循环判断哪些robot已经被选择了路线
+	//有几个机器人在危险区内
+	
 	for (int i = 0; i < robots.size(); ++i) {
 		if (map_id == 27 && i == 3) {
 			continue;
@@ -548,6 +562,12 @@ void Command::RobotDoWork()
 
 		double speed, angle;
 		normal_caculate(rt, speed, angle);
+
+		if (i != index && is_in_danger && rt.object_target.first > x[0] && rt.object_target.first<x[1] &&
+			rt.object_target.second>y[0] && rt.object_target.second < y[1]) {
+			speed = 0;
+		}
+
 
 		if (rt.object_target == rt.real_pos) {
 			angle_s.push_back(make_pair(i, 0));
