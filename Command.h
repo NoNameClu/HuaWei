@@ -35,7 +35,7 @@ const double lengthOneFrame = 0.15;
 const double lastbuyselect = 0.10;
 const int LAST_SELL_T = 8000;
 const double OVER = 0.5;
-const double coll_frame = 3;
+const double coll_frame = 7;
 const int PREDICT = 15;
 const int SECONDTOT = 50;
 const int CHECK_WINDOW = 10;
@@ -172,7 +172,7 @@ class Command
 	void RobotSelectWork();	//Ҷ
 	void RobotAvoid(int i);
 	void RobotColl();
-	//void Detroit_Weapons();
+	void Avalon_Weapons();
 	bool GetRoute(const robot&, route&, int id, const unordered_map<int, double>&);
 	void caculate_nextWay(robot& rb, bool is_before);
 
@@ -222,8 +222,8 @@ class Command
 	void puton_occ_stat(int id);
 	void puton_occ_stat(int id, int object);
 	void puton_need_stat(int id, int object);
-	//void takeoff_occ_stat(int id);
-	//void takeoff_occ_stat(int id, int object);
+	void takeoff_occ_stat(int id);
+	void takeoff_occ_stat(int id, int object);
 public:
 	Command() = default;
 	~Command() = default;

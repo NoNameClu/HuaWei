@@ -25,6 +25,7 @@ void Command::start()
 		RobotSelectWork();
 		Add_OK();
 		Response();
+		Avalon_Weapons();
 		Clear();
 	}
 }
@@ -111,6 +112,7 @@ void Command::initMap()
 				robot temp;
 				temp.state = NONE;
 				temp.object_target = make_pair(-1, -1);
+				temp.weapon.resize(Magazine_capacity);
 				robots.push_back(temp);
 			}
 			if (style.find(buf[j][i] - '0') != style.end()) {	// ¹¤×÷Ì¨
@@ -646,6 +648,32 @@ void Command::RobotColl()
 		}
 		visit.insert(i);
 	}
+}
+
+void Command::Avalon_Weapons()
+{
+	for (int i = 0; i < robots.size(); ++i) {
+		robot& rt = robots[i];
+		if (!rt.on_job) {
+			continue;
+		}
+
+		const auto& ago = rt.weapon[frame % Magazine_capacity];
+		if (ago.first != -1 && GetLength(ago, rt.real_pos) <= 0.2) {
+			string des = "destory ";
+			des += to_string(i);
+			response.push_back(des);
+
+			takeoff_occ_stat(rt.cur.start);
+			takeoff_occ_stat(rt.cur.start, rt.cur.object);
+			rt.on_job = false;
+			rt.state = NONE;
+
+		}
+
+		rt.weapon[frame % Magazine_capacity] = rt.real_pos;
+	}
+	flush_list();
 }
 
 bool Command::GetRoute(const robot& rb, route& ret, int id, const unordered_map<int, double>& accessible)
@@ -1723,6 +1751,48 @@ void Command::puton_need_stat(int id, int object) {
 		if (p->end == id && p->object == object) {
 			p->stat &= (~OCC_E);
 			p->stat |= NO_NEED;
+		}
+	}
+}
+
+void Command::takeoff_occ_stat(int id)
+{
+	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
+		if (p->start == id) {
+			p->stat &= (~OCC_E);
+		}
+	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		if (p->start == id) {
+			p->stat &= (~OCC_E);
+		}
+	}
+
+	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
+		if (p->start == id) {
+			p->stat &= (~OCC_E);
+		}
+	}
+}
+
+void Command::takeoff_occ_stat(int id, int object)
+{
+	for (auto p = avaliable.begin(); p != avaliable.end(); ++p) {
+		if (p->end == id && p->object == object) {
+			p->stat &= (~OCC_E);
+		}
+	}
+
+	for (auto p = maybe_avaliable.begin(); p != maybe_avaliable.end(); ++p) {
+		if (p->end == id && p->object == object) {
+			p->stat &= (~OCC_E);
+		}
+	}
+
+	for (auto p = unavaliable.begin(); p != unavaliable.end(); ++p) {
+		if (p->end == id && p->object == object) {
+			p->stat &= (~OCC_E);
 		}
 	}
 }
